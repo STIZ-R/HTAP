@@ -1,0 +1,5 @@
+<clickhouse>
+    <kafka>
+        <security_group_check>false</security_group_check>
+    </kafka>
+</clickhouse>

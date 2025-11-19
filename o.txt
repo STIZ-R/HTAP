@@ -1,0 +1,14 @@
+docker compose up -d
+
+--list des changements sur un topic kafka
+docker exec -it htap-kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic htap.public.users \
+  --from-beginning
+
+--list des topics sur kqfkq
+docker exec -it htap-kafka kafka-topics --bootstrap-server localhost:9092 --list
+
+--conect to postgre
+docker exec -it htap-postgres psql -U htap -d htapdb
+
