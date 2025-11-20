@@ -1,12 +1,12 @@
 CREATE TABLE IF NOT EXISTS users (
     id UInt32,
-    nom String,
+    name String,
     email String
-) ENGINE = MergeTree()
+) ENGINE = ReplacingMergeTree(id)
 ORDER BY id;
 
 CREATE TABLE IF NOT EXISTS n (
     id UInt32,
-    nom String
-) ENGINE = MergeTree()
+    name String
+) ENGINE = ReplacingMergeTree(id)
 ORDER BY id;

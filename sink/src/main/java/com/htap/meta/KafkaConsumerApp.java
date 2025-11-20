@@ -1,6 +1,8 @@
 package com.htap.meta;
 
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.common.PartitionInfo;
+
 import java.sql.*;
 import java.time.Duration;
 import java.util.*;
@@ -12,7 +14,11 @@ public class KafkaConsumerApp {
     public static void main(String[] args) throws Exception {
 
         String kafkaBootstrap = System.getenv().getOrDefault("KAFKA_BOOTSTRAP", "kafka:9092");
-        String clickhouseUrl = System.getenv().getOrDefault("CLICKHOUSE_URL", "jdbc:ch://clickhouse:8123/default?use_http_transport=true");
+        String clickhouseUrl = System.getenv().getOrDefault(
+                "CLICKHOUSE_URL",
+                "jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true"
+        );
+
         System.out.println("ClickHouse URL: " + clickhouseUrl);
 
         Properties props = new Properties();
@@ -23,9 +29,18 @@ public class KafkaConsumerApp {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
-        consumer.subscribe(Collections.singletonList("htap.public.users"));
 
-        System.out.println("Kafka consumer démarré...");
+        // Lister tous les topics et ne prendre que ceux qui commencent par htap.
+        Map<String, List<PartitionInfo>> allTopics = consumer.listTopics();
+        List<String> htapTopics = new ArrayList<>();
+        for (String topic : allTopics.keySet()) {
+            if (topic.startsWith("htap.")) {
+                htapTopics.add(topic);
+            }
+        }
+
+        consumer.subscribe(htapTopics);
+        System.out.println("Kafka consumer démarré pour les topics: " + htapTopics);
 
         Connection conn = null;
         while (conn == null) {
@@ -38,19 +53,25 @@ public class KafkaConsumerApp {
             }
         }
 
-        List<Map<String, Object>> batch = new ArrayList<>();
+        Map<String, List<Map<String, Object>>> batches = new HashMap<>();
 
         while (true) {
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
 
             for (ConsumerRecord<String, String> record : records) {
                 try {
+                    String table = topicToTable(record.topic());
                     Map<String, Object> row = Row2Column.convert(record.value());
-                    batch.add(row);
 
-                    if (batch.size() >= BATCH_SIZE) {
-                        insertBatch(conn, batch);
-                        batch.clear();
+                    // Retirer les colonnes inutiles
+                    row.keySet().removeIf(k -> k.startsWith("_") || k.equals("before") || k.equals("after"));
+
+                    batches.computeIfAbsent(table, k -> new ArrayList<>()).add(row);
+
+                    // Insert batch si taille dépassée
+                    if (batches.get(table).size() >= BATCH_SIZE) {
+                        insertBatch(conn, table, batches.get(table));
+                        batches.get(table).clear();
                     }
                 } catch (Exception e) {
                     System.err.println("Erreur traitement record: " + e.getMessage());
@@ -58,30 +79,74 @@ public class KafkaConsumerApp {
                 }
             }
 
-            if (!batch.isEmpty()) {
-                try {
-                    insertBatch(conn, batch);
-                    batch.clear();
-                } catch (Exception e) {
-                    System.err.println("Erreur insertion batch: " + e.getMessage());
-                    e.printStackTrace();
+            // Flush restant
+            for (Map.Entry<String, List<Map<String, Object>>> entry : batches.entrySet()) {
+                if (!entry.getValue().isEmpty()) {
+                    try {
+                        insertBatch(conn, entry.getKey(), entry.getValue());
+                        entry.getValue().clear();
+                    } catch (Exception e) {
+                        System.err.println("Erreur insertion batch pour table " + entry.getKey() + ": " + e.getMessage());
+                        e.printStackTrace();
+                    }
                 }
             }
         }
     }
 
-    private static void insertBatch(Connection conn, List<Map<String, Object>> batch) throws SQLException {
-        String sql = "INSERT INTO users (id, nom, email) VALUES (?, ?, ?)";
+    private static String topicToTable(String topic) {
+        String[] parts = topic.split("\\.");
+        return parts.length == 3 ? parts[2] : topic;
+    }
+
+    private static void insertBatch(Connection conn, String table, List<Map<String, Object>> batch) throws SQLException {
+        if (batch.isEmpty()) return;
+
+        // Récupérer les colonnes existantes dans la table ClickHouse
+        Set<String> existingColumns = getExistingColumns(conn, table);
+
+        // Préparer uniquement les colonnes existantes dans la table
+        List<String> columnsToInsert = new ArrayList<>();
+        for (String col : batch.get(0).keySet()) {
+            if (existingColumns.contains(col)) {
+                columnsToInsert.add(col);
+            }
+        }
+
+        if (columnsToInsert.isEmpty()) {
+            System.err.println("Aucune colonne correspondante trouvée dans " + table);
+            return;
+        }
+
+        String colNames = String.join(", ", columnsToInsert);
+        String placeholders = String.join(", ", Collections.nCopies(columnsToInsert.size(), "?"));
+        String sql = "INSERT INTO " + table + " (" + colNames + ") VALUES (" + placeholders + ")";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             for (Map<String, Object> row : batch) {
-                ps.setObject(1, row.get("id"));
-                ps.setObject(2, row.get("nom"));
-                ps.setObject(3, row.get("email"));
+                int idx = 1;
+                for (String col : columnsToInsert) {
+                    ps.setObject(idx++, row.get(col));
+                }
                 ps.addBatch();
             }
             ps.executeBatch();
-            System.out.println("Batch inséré: " + batch.size() + " lignes");
+            System.out.println("Batch inséré dans " + table + ": " + batch.size() + " lignes");
         }
     }
+
+    private static Set<String> getExistingColumns(Connection conn, String table) throws SQLException {
+        Set<String> columns = new HashSet<>();
+        String sql = "SELECT name FROM system.columns WHERE database = 'default' AND table = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, table);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    columns.add(rs.getString("name"));
+                }
+            }
+        }
+        return columns;
+    }
+
 }
