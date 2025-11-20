@@ -6,9 +6,18 @@ docker exec -it htap-kafka kafka-console-consumer \
   --topic htap.public.users \
   --from-beginning
 
---list des topics sur kqfkq
+--list des topics sur kafka
 docker exec -it htap-kafka kafka-topics --bootstrap-server localhost:9092 --list
 
 --conect to postgre
 docker exec -it htap-postgres psql -U htap -d htapdb
 
+--tester l'archi
+1) lancer le docker compose (attendre 15 sec que tout les conteneurs se lancent, tester avec curl http://localhost:8083/connectors
+2) lancer le conteneur postgre avec `docker exec -it htap-postgres psql -U htap -d htapdb` et y insérer, supprimer, update les tables EXISTANTES.
+3) check les topics kafka bien crées `docker exec -it htap-kafka kafka-topics --bootstrap-server localhost:9092 --list`
+4) check le résultat json de kafka d'un des topic (changer le KAFKA_TOPIC_NAME) avec:
+                                                         docker exec -it htap-kafka kafka-console-consumer \
+                                                         --bootstrap-server localhost:9092 \
+                                                         --topic htap.public.KAFKA_TOPIC_NAME \
+                                                         --from-beginning

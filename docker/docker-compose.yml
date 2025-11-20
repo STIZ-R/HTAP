@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+
   postgres:
     image: debezium/postgres:15
     container_name: htap-postgres
@@ -12,6 +13,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - htap-net
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.3
@@ -23,10 +26,14 @@ services:
       - kafka
     environment:
       CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse/init:/docker-entrypoint-initdb.d
       - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/kafka.xml
-
+    networks:
+      - htap-net
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -35,6 +42,8 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
     ports:
       - "2181:2181"
+    networks:
+      - htap-net
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -48,6 +57,8 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
       - "9092:9092"
+    networks:
+      - htap-net
 
   connect:
     image: debezium/connect:2.6
@@ -69,6 +80,8 @@ services:
       INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
     volumes:
       - ./connectors:/kafka/connectors
+    networks:
+      - htap-net
 
   init-connect:
     image: curlimages/curl:8.2.1
@@ -78,7 +91,27 @@ services:
       - ./connectors:/kafka/connectors
       - ./init-connect.sh:/init-connect.sh
     entrypoint: [ "/bin/sh", "/init-connect.sh" ]
+    networks:
+      - htap-net
+
+  sink:
+    build:
+      context: ../sink
+    container_name: htap-sink
+    depends_on:
+      - kafka
+      - clickhouse
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
+    restart: always
+    networks:
+      - htap-net
 
 volumes:
   postgres_data:
   clickhouse_data:
+
+networks:
+  htap-net:
+    driver: bridge
