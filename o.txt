@@ -1,18 +1,24 @@
-docker compose up -d
+docker compose up -d  || docker compose up --build -d
 
 --list des changements sur un topic kafka
-docker exec -it htap-kafka kafka-console-consumer \
-  --bootstrap-server localhost:9092 \
-  --topic htap.public.users \
-  --from-beginning
+docker exec -it htap-kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic htap.public.users --from-beginning
 
 --list des topics sur kafka
 docker exec -it htap-kafka kafka-topics --bootstrap-server localhost:9092 --list
 
---conect to postgre
+--conect to postgres
 docker exec -it htap-postgres psql -U htap -d htapdb
 
+--conenct to clickhouse
+ docker exec -it htap-clickhouse clickhouse-client --user=default --password=clickhouse
+
+--log sink
+docker logs -f htap-sink
+
+
 --tester l'archi
+0*) récupérer un jar propre si modif sur le sink en faisant un `mvn clean package` dessus
+0**) supprimer les volumes dockers à  chaque changement de BD avec `docker compose down -v`
 1) lancer le docker compose (attendre 15 sec que tout les conteneurs se lancent, tester avec curl http://localhost:8083/connectors
 2) lancer le conteneur postgre avec `docker exec -it htap-postgres psql -U htap -d htapdb` et y insérer, supprimer, update les tables EXISTANTES.
 3) check les topics kafka bien crées `docker exec -it htap-kafka kafka-topics --bootstrap-server localhost:9092 --list`

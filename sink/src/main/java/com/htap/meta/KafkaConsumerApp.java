@@ -30,7 +30,7 @@ public class KafkaConsumerApp {
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
 
-        // Lister tous les topics et ne prendre que ceux qui commencent par htap.
+        // Lister tous les topics qui commencent par htap.
         Map<String, List<PartitionInfo>> allTopics = consumer.listTopics();
         List<String> htapTopics = new ArrayList<>();
         for (String topic : allTopics.keySet()) {
@@ -39,9 +39,15 @@ public class KafkaConsumerApp {
             }
         }
 
+        if (htapTopics.isEmpty()) {
+            System.err.println("Aucun topic htap trouvé, arrêt du consumer.");
+            return;
+        }
+
         consumer.subscribe(htapTopics);
         System.out.println("Kafka consumer démarré pour les topics: " + htapTopics);
 
+        // Connexion ClickHouse
         Connection conn = null;
         while (conn == null) {
             try {
@@ -63,8 +69,8 @@ public class KafkaConsumerApp {
                     String table = topicToTable(record.topic());
                     Map<String, Object> row = Row2Column.convert(record.value());
 
-                    // Retirer les colonnes inutiles
-                    row.keySet().removeIf(k -> k.startsWith("_") || k.equals("before") || k.equals("after"));
+                    // Supprimer uniquement les champs "before" et "after", garder _version et _deleted
+                    row.keySet().removeIf(k -> k.equals("before") || k.equals("after"));
 
                     batches.computeIfAbsent(table, k -> new ArrayList<>()).add(row);
 
@@ -102,10 +108,9 @@ public class KafkaConsumerApp {
     private static void insertBatch(Connection conn, String table, List<Map<String, Object>> batch) throws SQLException {
         if (batch.isEmpty()) return;
 
-        // Récupérer les colonnes existantes dans la table ClickHouse
+        // Récupérer les colonnes existantes dans ClickHouse
         Set<String> existingColumns = getExistingColumns(conn, table);
 
-        // Préparer uniquement les colonnes existantes dans la table
         List<String> columnsToInsert = new ArrayList<>();
         for (String col : batch.get(0).keySet()) {
             if (existingColumns.contains(col)) {
@@ -148,5 +153,4 @@ public class KafkaConsumerApp {
         }
         return columns;
     }
-
 }
