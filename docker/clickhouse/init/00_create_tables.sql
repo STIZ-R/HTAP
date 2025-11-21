@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
     _version UInt64,      -- Debezium ts_ms
     _deleted UInt8        -- 1 si delete, 0 sinon
 )
-ENGINE = ReplacingMergeTree(_version)
+ENGINE = ReplacingMergeTree(id)
 ORDER BY id;
 
 -- -------------------------
@@ -40,5 +40,5 @@ CREATE TABLE IF NOT EXISTS orders (
     _version UInt64,
     _deleted UInt8
 )
-ENGINE = ReplacingMergeTree(_version)
+ENGINE = ReplacingMergeTree(id)
 ORDER BY id;
