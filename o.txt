@@ -27,3 +27,20 @@ docker logs -f htap-sink
                                                          --bootstrap-server localhost:9092 \
                                                          --topic htap.public.KAFKA_TOPIC_NAME \
                                                          --from-beginning
+5) pour voir les changements effectifs de la base clickhouse, utiliser SELECT id,
+                                                                              argMax(name, _version) AS name,
+                                                                              argMax(email, _version) AS email
+                                                                       FROM users
+                                                                       WHERE _deleted = 0
+                                                                       GROUP BY id
+
+6) inserer 500k lignes dans postgres
+
+   INSERT INTO users (name, email)
+   SELECT
+       'User ' || i,                          -- génère un nom du type "User 1", "User 2", ...
+       'user' || i || '@example.com'          -- génère un email unique "user1@example.com", etc.
+   FROM generate_series(1, 500000) AS i;
+   INSERT 0 500000
+
+   10 sec pour 500k lignes (temps entre postgre -> clickhouse)

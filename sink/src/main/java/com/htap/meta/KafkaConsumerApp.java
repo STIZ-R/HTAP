@@ -30,7 +30,7 @@ public class KafkaConsumerApp {
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
 
-        // Lister tous les topics qui commencent par htap.
+        // Récupérer tous les topics htap.*
         Map<String, List<PartitionInfo>> allTopics = consumer.listTopics();
         List<String> htapTopics = new ArrayList<>();
         for (String topic : allTopics.keySet()) {
@@ -39,15 +39,14 @@ public class KafkaConsumerApp {
             }
         }
 
-        if (htapTopics.isEmpty()) {
-            System.err.println("Aucun topic htap trouvé, arrêt du consumer.");
+        if(htapTopics.isEmpty()) {
+            System.err.println("Aucun topic htap trouvé !");
             return;
         }
 
         consumer.subscribe(htapTopics);
         System.out.println("Kafka consumer démarré pour les topics: " + htapTopics);
 
-        // Connexion ClickHouse
         Connection conn = null;
         while (conn == null) {
             try {
@@ -69,14 +68,13 @@ public class KafkaConsumerApp {
                     String table = topicToTable(record.topic());
                     Map<String, Object> row = Row2Column.convert(record.value());
 
-                    // Supprimer uniquement les champs "before" et "after", garder _version et _deleted
+                    // Supprimer les champs inutiles
                     row.keySet().removeIf(k -> k.equals("before") || k.equals("after"));
 
                     batches.computeIfAbsent(table, k -> new ArrayList<>()).add(row);
 
-                    // Insert batch si taille dépassée
                     if (batches.get(table).size() >= BATCH_SIZE) {
-                        insertBatch(conn, table, batches.get(table));
+                        insertBatchAndDelete(conn, table, batches.get(table));
                         batches.get(table).clear();
                     }
                 } catch (Exception e) {
@@ -89,7 +87,7 @@ public class KafkaConsumerApp {
             for (Map.Entry<String, List<Map<String, Object>>> entry : batches.entrySet()) {
                 if (!entry.getValue().isEmpty()) {
                     try {
-                        insertBatch(conn, entry.getKey(), entry.getValue());
+                        insertBatchAndDelete(conn, entry.getKey(), entry.getValue());
                         entry.getValue().clear();
                     } catch (Exception e) {
                         System.err.println("Erreur insertion batch pour table " + entry.getKey() + ": " + e.getMessage());
@@ -105,10 +103,10 @@ public class KafkaConsumerApp {
         return parts.length == 3 ? parts[2] : topic;
     }
 
-    private static void insertBatch(Connection conn, String table, List<Map<String, Object>> batch) throws SQLException {
+    // Insère le batch et supprime les lignes marquées _deleted=1
+    private static void insertBatchAndDelete(Connection conn, String table, List<Map<String, Object>> batch) throws SQLException {
         if (batch.isEmpty()) return;
 
-        // Récupérer les colonnes existantes dans ClickHouse
         Set<String> existingColumns = getExistingColumns(conn, table);
 
         List<String> columnsToInsert = new ArrayList<>();
@@ -137,6 +135,15 @@ public class KafkaConsumerApp {
             }
             ps.executeBatch();
             System.out.println("Batch inséré dans " + table + ": " + batch.size() + " lignes");
+        }
+
+        // Supprimer les lignes marquées _deleted = 1
+        String deleteSql = "ALTER TABLE " + table + " DELETE WHERE _deleted = 1";
+        try (Statement stmt = conn.createStatement()) {
+            int deleted = stmt.executeUpdate(deleteSql);
+            if (deleted > 0) {
+                System.out.println("Lignes supprimées dans " + table + " (_deleted=1)");
+            }
         }
     }
 

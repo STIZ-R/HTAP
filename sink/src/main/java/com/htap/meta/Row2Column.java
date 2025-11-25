@@ -11,7 +11,7 @@ public class Row2Column {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     /**
-     * Transforme un message Debezium en colonnes
+     * Transforme un message Debezium en colonnes pour ClickHouse
      * @param jsonMessage le message Kafka Debezium
      * @return map colonne -> valeur
      * @throws Exception en cas d'erreur JSON
@@ -20,27 +20,28 @@ public class Row2Column {
         Map<String, Object> row = new HashMap<>();
         JsonNode root = mapper.readTree(jsonMessage);
         JsonNode payload = root.get("payload");
+        if (payload == null) return row;
 
-        if (payload == null) {
-            return row;
-        }
-
-        // 'after' contient la ligne insérée ou mise à jour
         JsonNode after = payload.get("after");
         JsonNode before = payload.get("before");
-        JsonNode op = payload.get("op"); // c = insert, u = update, d = delete, r = snapshot
+        JsonNode op = payload.get("op"); // c = insert, u = update, d = delete
 
+        // Récupérer le timestamp unique pour _version
+        long version = payload.has("ts_ms") ? payload.get("ts_ms").asLong() :
+                (payload.has("source") && payload.get("source").has("ts_ms")) ?
+                        payload.get("source").get("ts_ms").asLong() :
+                        System.currentTimeMillis();
+
+        // Copier les colonnes
         if (after != null) {
-            after.fieldNames().forEachRemaining(field -> {
-                row.put(field, after.get(field).isNull() ? null : after.get(field).asText());
-            });
-            row.put("_op", op.asText());
-        } else if (before != null) { // pour les deletes
-            before.fieldNames().forEachRemaining(field -> {
-                row.put(field, before.get(field).isNull() ? null : before.get(field).asText());
-            });
-            row.put("_op", op.asText());
+            after.fieldNames().forEachRemaining(f -> row.put(f, after.get(f).isNull() ? null : after.get(f).asText()));
+        } else if (before != null) { // delete
+            before.fieldNames().forEachRemaining(f -> row.put(f, before.get(f).isNull() ? null : before.get(f).asText()));
         }
+
+        row.put("_op", op != null ? op.asText() : "c");
+        row.put("_version", version);
+        row.put("_deleted", "d".equals(op != null ? op.asText() : "") ? 1 : 0);
 
         return row;
     }
