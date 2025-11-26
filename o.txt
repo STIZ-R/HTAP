@@ -44,3 +44,23 @@ docker logs -f htap-sink
    INSERT 0 500000
 
    10 sec pour 500k lignes (temps entre postgre -> clickhouse)
+
+
+
+7) Check le lag entre la première insertion et la dernière:
+SELECT
+    min(_version) AS first_ts,
+    max(_version) AS last_ts
+FROM users;
+
+SELECT CAST(now64(3), 'Float64') * 1000 AS ch_now_ms;
+
+SELECT
+    (CAST(now64(3), 'Float64')*1000 - min(_version)) AS lag_first_ms,
+    (CAST(now64(3), 'Float64')*1000 - max(_version)) AS lag_last_ms
+FROM users;
+
+8) check les deletes/updates,...
+OPTIMIZE TABLE users FINAL; afin de forcer la màj des _deleted = '1'
+ou
+directement lire avec SELECT * FROM [table] FINAL;
