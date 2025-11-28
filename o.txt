@@ -64,3 +64,18 @@ FROM users;
 OPTIMIZE TABLE users FINAL; afin de forcer la màj des _deleted = '1'
 ou
 directement lire avec SELECT * FROM [table] FINAL;
+--pour les delete, utiliser ALTER TABLE [table] DELETE WHERE _deleted = '1'; (cela supprime les tombstones)
+
+9)  check le nombre de parts dans clickhouse (Le + de parts, le - bien)
+SELECT
+    `table`,
+    count() AS parts,
+    sum(rows) AS rows,
+    (sum(bytes_on_disk) / 1024) / 1024 AS mb,
+    engine
+FROM system.parts
+WHERE `table` = 'users'
+GROUP BY
+    `table`,
+    engine
+ORDER BY parts DESC
