@@ -28,14 +28,14 @@ public class Row2Column {
         long version = ts;
 
         if ("d".equals(op)) {
-            version = ts + 1; // delete > insert/update
+            version = ts + 1; // delete > insert/update; we give it the priority for the merge on _version
         }
 
         row.put("_op", op);
         row.put("_version", version);
         row.put("_deleted", "d".equals(op) ? 1 : 0);
 
-        // ---- CAS DELETE ----
+        // DELETE
         if ("d".equals(op)) {
             if (before != null && before.has("id")) {
                 row.put("id", before.get("id").asLong());
@@ -43,7 +43,7 @@ public class Row2Column {
             return row;  // Delete = PK seule + deleted flag
         }
 
-        // ---- INSERT / UPDATE ----
+        // INSERT / UPDATE
         JsonNode nodeToCopy = after != null ? after : before;
         if (nodeToCopy != null) {
             nodeToCopy.fieldNames().forEachRemaining(f -> {

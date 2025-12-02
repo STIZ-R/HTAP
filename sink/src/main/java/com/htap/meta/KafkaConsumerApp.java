@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 public class KafkaConsumerApp {
 
     private static final int BATCH_MAX_SIZE = 500_000;
-    private static final long FLUSH_INTERVAL_MS = 2000; // flush toutes les 2s
+    private static final long FLUSH_INTERVAL_MS = 2000; // flush toutes les 2s (si le batch_size n'est pas atteint)
 
     public static void main(String[] args) throws Exception {
         String kafkaBootstrap = System.getenv().getOrDefault("KAFKA_BOOTSTRAP", "kafka:9092");
@@ -73,7 +73,6 @@ public class KafkaConsumerApp {
                 String table = topicToTable(record.topic());
                 Map<String, Object> row = Row2Column.convert(record.value());
 
-                // Ignorer les lignes invalides
                 Object idObj = row.get("id");
                 if (idObj == null) continue;
 
@@ -81,7 +80,7 @@ public class KafkaConsumerApp {
                 try {
                     id = Long.parseLong(idObj.toString());
                 } catch (Exception e) {
-                    continue; // id illisible → on skip
+                    continue;
                 }
 
                 if (id == 0) continue;

@@ -1,0 +1,4 @@
+/home/etudiant/Bureau/HTAP/proxy/executors/src/main/java/com/htap/meta/types/JDBCResultMerger.java
+/home/etudiant/Bureau/HTAP/proxy/executors/src/main/java/com/htap/meta/OLAPExecutor.java
+/home/etudiant/Bureau/HTAP/proxy/executors/src/main/java/com/htap/meta/OLTPExecutor.java
+/home/etudiant/Bureau/HTAP/proxy/executors/src/main/java/com/htap/meta/ExecutorFactory.java

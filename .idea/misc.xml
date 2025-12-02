@@ -10,12 +10,6 @@
         <option value="$PROJECT_DIR$/hotcold-manager/pom.xml" />
       </list>
     </option>
-    <option name="ignoredFiles">
-      <set>
-        <option value="$PROJECT_DIR$/proxy/executors/pom.xml" />
-        <option value="$PROJECT_DIR$/proxy/utils/pom.xml" />
-      </set>
-    </option>
   </component>
   <component name="ProjectRootManager" version="2" languageLevel="JDK_25" default="true" project-jdk-name="openjdk-25" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/out" />

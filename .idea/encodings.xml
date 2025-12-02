@@ -3,6 +3,10 @@
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$/proxy/executors/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/proxy/executors/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/proxy/proxy-core/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/proxy/proxy-core/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/proxy/utils/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/proxy/utils/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sink/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sink/src/main/resources" charset="UTF-8" />
   </component>

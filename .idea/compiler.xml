@@ -6,15 +6,13 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="proxy" />
+        <module name="executors" />
+        <module name="proxy-core" />
         <module name="meta-service" />
         <module name="sink" />
+        <module name="utils" />
         <module name="hotcold-manager" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="executors" target="25" />
-      <module name="utils" target="1.5" />
-    </bytecodeTargetLevel>
   </component>
 </project>
