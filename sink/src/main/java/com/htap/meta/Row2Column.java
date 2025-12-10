@@ -5,9 +5,26 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Conversion des messages Debezium (JSON) en ligne générique.
+ *
+ * - Parse le JSON produit par Debezium (structure payload/before/after/op).
+ * - Extrait l'opération (c, u, d), le timestamp logique ts_ms et en déduit un _version.
+ * - Produit une Map<String, Object> avec :
+ *   - des méta-colonnes (_op, _version, _deleted),
+ *   - les colonnes métier (id, etc.) copiées depuis "after" ou "before".
+ */
 public class Row2Column {
+
     private static final ObjectMapper mapper = new ObjectMapper();
 
+    /**
+     * Convertit un message JSON Debezium en map colonne → valeur.
+     *
+     * @param jsonMessage message JSON brut reçu depuis Kafka
+     * @return une Map représentant la ligne à insérer (peut être vide si payload null)
+     * @throws Exception si le parsing JSON échoue
+     */
     public static Map<String, Object> convert(String jsonMessage) throws Exception {
         Map<String, Object> row = new HashMap<>();
         JsonNode root = mapper.readTree(jsonMessage);

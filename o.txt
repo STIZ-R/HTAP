@@ -82,4 +82,3 @@ ORDER BY parts DESC
 
 10) Lancer le containeur proxy en itératif
     docker exec -it htap-proxy /wait-for-postgres.sh
-    
