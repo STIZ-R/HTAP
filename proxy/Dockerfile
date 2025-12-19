@@ -6,6 +6,7 @@ COPY pom.xml .
 COPY proxy-core ./proxy-core
 COPY utils ./utils
 COPY executors ./executors
+COPY proxy-api ./proxy-api
 
 RUN mvn clean package -DskipTests
 
@@ -15,8 +16,8 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
 
-# Copier le JAR shaded (le bon !)
-COPY --from=build /app/proxy-core/target/proxy.jar ./proxy.jar
+# Copier le JAR Spring Boot construit par proxy-api
+COPY --from=build /app/proxy-api/target/proxy-api-1.0-SNAPSHOT.jar ./app.jar
 
 # Script wait-for
 COPY wait-for-postgres.sh /wait-for-postgres.sh
@@ -25,4 +26,5 @@ RUN chmod +x /wait-for-postgres.sh
 ENV POSTGRES_HOST=postgres
 ENV POSTGRES_PORT=5432
 
-CMD ["/wait-for-postgres.sh"]
+# Lancer Spring Boot après avoir attendu Postgres
+CMD ["/bin/sh", "-c", "/wait-for-postgres.sh"]

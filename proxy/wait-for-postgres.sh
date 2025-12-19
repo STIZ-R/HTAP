@@ -9,4 +9,4 @@ while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do
 done
 
 echo "PostgreSQL is up! Starting proxy..."
-exec java -jar /app/proxy.jar
+exec java -jar /app/app.jar

@@ -95,18 +95,33 @@ services:
     networks:
       - htap-net
 
+#  proxy:
+#    build:
+#      context: ../proxy
+#    container_name: htap-proxy
+#    stdin_open: true
+#    tty: true
+#    depends_on:
+#      - postgres
+#      - clickhouse
+#    environment:
+#      POSTGRES_URL: jdbc:postgresql://postgres:5432/htapdb?user=htap&password=htap
+#      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
+#    networks:
+#      - htap-net
+
   proxy:
     build:
       context: ../proxy
     container_name: htap-proxy
-    stdin_open: true
-    tty: true
     depends_on:
       - postgres
       - clickhouse
     environment:
       POSTGRES_URL: jdbc:postgresql://postgres:5432/htapdb?user=htap&password=htap
       CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
+    ports:
+      - "8080:8080"
     networks:
       - htap-net
 

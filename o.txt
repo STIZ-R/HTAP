@@ -82,3 +82,10 @@ ORDER BY parts DESC
 
 10) Lancer le containeur proxy en itératif
     docker exec -it htap-proxy /wait-for-postgres.sh
+
+
+curl "http://localhost:8080/proxy/query?sql=INSERT INTO test_table(id, value) VALUES (1,'abc')"
+curl "http://localhost:8080/proxy/query?sql=INSERT+INTO+users+(name,+email)                                                SELECT
+                                                    'User ' || i,                          -- génère un nom du type "User 1", "User 2", ...
+                                                    'user' || i || '@example.com'          -- génère un email unique "user1@example.com", etc.
+                                                FROM generate_series(1, 500000) AS i;
