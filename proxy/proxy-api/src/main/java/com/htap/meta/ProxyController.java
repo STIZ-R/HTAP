@@ -3,11 +3,19 @@ package com.htap.meta;
 import com.htap.meta.routing.QueryRouter;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Contrôleur REST exposant le proxy HTAP.
+import java.util.List;
+
+/*
+ * Contrôleur REST du proxy HTAP.
  *
- * Fournit des endpoints HTTP permettant d'envoyer une requête SQL
- * au proxy, qui la route ensuite vers PostgreSQL ou ClickHouse.
+ * Ce contrôleur expose une API HTTP volontairement simple :
+ * - GET  /proxy/query        → compatibilité, debug
+ * - POST /proxy/query        → requête SQL unique
+ * - POST /proxy/query/batch  → batch de requêtes (PERFORMANCE)
+ *
+ * IMPORTANT :
+ * - Toute la logique métier est dans QueryRouter
+ * - Le contrôleur ne fait QUE du transport HTTP
  */
 @RestController
 @RequestMapping("/proxy")
@@ -15,46 +23,100 @@ public class ProxyController {
 
     private final QueryRouter queryRouter;
 
-    /**
-     * Injection du QueryRouter existant.
-     *
-     * @param queryRouter composant de routage HTAP
+    /*
+     * Injection du QueryRouter (Spring).
      */
     public ProxyController(QueryRouter queryRouter) {
         this.queryRouter = queryRouter;
     }
 
-    /**
-     * Endpoint GET simple :
-     * /proxy/query?sql=SELECT+*+FROM+orders
+    /*
+     * ==========================
+     * MODE SIMPLE (DEBUG)
+     * ==========================
      *
-     * @param sql requête SQL brute
-     * @return résultat renvoyé par le QueryRouter (liste de lignes, null, etc.)
-     * @throws Exception si l'exécution de la requête échoue
+     * GET /proxy/query?sql=SELECT+1
+     *
+     * À utiliser pour :
+     * - tests manuels
+     * - healthcheck
+     * - debug
+     *
      */
     @GetMapping("/query")
     public Object executeQuery(@RequestParam("sql") String sql) throws Exception {
         return queryRouter.route(sql);
     }
 
-    /**
-     * Payload pour l'appel POST JSON.
+    /*
+     * ==========================
+     * MODE POST SQL UNIQUE
+     * ==========================
+     *
+     * POST /proxy/query
+     * {
+     *   "sql": "SELECT * FROM orders"
+     * }
+     *
+     * Utile pour :
+     * - clients simples
+     * - compatibilité
+     */
+    @PostMapping("/query")
+    public Object executeQueryPost(@RequestBody SqlRequest req) throws Exception {
+        return queryRouter.route(req.sql);
+    }
+
+    /*
+     * ==========================
+     * MODE BATCH (PERFORMANCE)
+     * ==========================
+     *
+     * POST /proxy/query/batch
+     *
+     * {
+     *   "statements": [
+     *     "INSERT INTO orders ...",
+     *     "INSERT INTO orders ...",
+     *     "INSERT INTO orders ..."
+     *   ]
+     * }
+     *
+     * Ce endpoint est CRITIQUE pour atteindre > 1000 TPS :
+     * - 1 appel HTTP = N requêtes SQL
+     * - Le router s’occupe du dispatch OLTP / OLAP
+     */
+    @PostMapping("/query/batch")
+    public void executeBatch(@RequestBody SqlBatchRequest req) throws Exception {
+        for (String sql : req.statements) {
+            try {
+                queryRouter.route(sql);
+            } catch (Exception e) {
+                System.err.println("Error executing SQL: " + sql);
+                e.printStackTrace();
+                throw e; // pour continuer à renvoyer 500
+            }
+        }
+    }
+
+
+    /*
+     * ==========================
+     * DTOs HTTP
+     * ==========================
+     */
+
+    /*
+     * Payload pour SQL unique.
      */
     public static class SqlRequest {
         public String sql;
     }
 
-    /**
-     * Endpoint POST JSON :
-     * POST /proxy/query
-     * { "sql": "SELECT * FROM orders" }
-     *
-     * @param req objet contenant la requête SQL
-     * @return résultat renvoyé par le QueryRouter
-     * @throws Exception si l'exécution de la requête échoue
+    /*
+     * Payload pour batch SQL.
      */
-    @PostMapping("/query")
-    public Object executeQueryPost(@RequestBody SqlRequest req) throws Exception {
-        return queryRouter.route(req.sql);
+    public static class SqlBatchRequest {
+        public List<String> statements;
     }
 }

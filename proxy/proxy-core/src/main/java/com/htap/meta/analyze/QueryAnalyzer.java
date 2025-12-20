@@ -1,86 +1,70 @@
 package com.htap.meta.analyze;
 
 import com.htap.meta.routing.QueryRouteDecision;
-import net.sf.jsqlparser.parser.CCJSqlParserUtil;
-import net.sf.jsqlparser.statement.Statement;
-import net.sf.jsqlparser.statement.select.Select;
-import net.sf.jsqlparser.statement.insert.Insert;
-import net.sf.jsqlparser.statement.update.Update;
-import net.sf.jsqlparser.statement.delete.Delete;
-
 
 /**
  * Analyseur de requêtes SQL pour le proxy HTAP.
  *
- * Utilise JSqlParser pour parser la requête et déterminer le type de charge :
- * - requêtes de modification de données (INSERT, UPDATE, DELETE) → OLTP_ONLY,
- * - requêtes SELECT simples → OLTP_ONLY par défaut,
- * - requêtes SELECT avec agrégations ou GROUP BY → OLAP_ONLY.
+ * Règles simples (POC) :
+ * - INSERT / UPDATE / DELETE  -> OLTP
+ * - SELECT simple             -> OLAP
+ * - SELECT avec hint HYBRID   -> HYBRID
  */
 public class QueryAnalyzer {
 
-    /**
-     * Analyse la requête SQL et renvoie une décision de routage.
-     *
-     * @param sql requête SQL brute
-     * @return une décision de type QueryRouteDecision (OLTP_ONLY ou OLAP_ONLY)
-     * @throws Exception si le parsing de la requête échoue
-     */
-//    public QueryRouteDecision analyze(String sql) throws Exception {
-//        Statement stmt = CCJSqlParserUtil.parse(sql);
-//
-//        if (stmt instanceof Insert || stmt instanceof Update || stmt instanceof Delete) {
-//            return QueryRouteDecision.OLTP_ONLY;
-//        }
-//        if (stmt instanceof Select) {
-//            Select select = (Select) stmt;
-//            String lower = select.toString().toLowerCase();
-//            if (lower.contains("group by") || lower.matches(".*(sum|avg|count|min|max)\\(.*\\).*")) {
-//                return QueryRouteDecision.OLAP_ONLY;
-//            }
-//        }
-//        return QueryRouteDecision.OLTP_ONLY;
-//    }
-    public QueryRouteDecision analyze(String sql) throws Exception {
-        Statement stmt = CCJSqlParserUtil.parse(sql);
-        String lower = sql.toLowerCase();
+    public QueryRouteDecision analyze(String sql) {
+        String upper = sql.trim().toUpperCase();
 
-        // --- 1. Toute modification = OLTP
-        if (stmt instanceof Insert || stmt instanceof Update || stmt instanceof Delete) {
+        if (upper.startsWith("INSERT")
+                || upper.startsWith("UPDATE")
+                || upper.startsWith("DELETE")) {
             return QueryRouteDecision.OLTP_ONLY;
         }
 
-        if (stmt instanceof Select) {
-
-            // --- 2. SELECT à clé → OLTP
-            if (lower.matches(".*where\\s+.*id\\s*=.*")) {
-                return QueryRouteDecision.OLTP_ONLY;
-            }
-
-            // --- 3. Requêtes analytiques classiques (OLAP)
-            if (lower.contains("group by") ||
-                    lower.contains("having") ||
-                    lower.contains("distinct") ||
-                    lower.contains("union") ||
-                    lower.contains("join") ||        // TPC-H contient toujours des JOIN
-                    lower.contains("order by") ||
-                    lower.contains("limit") && !lower.matches(".*limit\\s+1.*") ||
-                    lower.matches(".*(sum|avg|count|min|max)\\s*\\(.*\\).*")) {
-
-                return QueryRouteDecision.OLAP_ONLY;
-            }
-
-            // --- 4. Sous-requêtes = OLAP
-            if (lower.contains("select") && lower.contains("from") && lower.contains("(")) {
-                return QueryRouteDecision.OLAP_ONLY;
-            }
-
-            // --- 5. Par défaut, OLTP
-            return QueryRouteDecision.OLTP_ONLY;
+        if (upper.contains("HTAP_HYBRID")) {
+            return QueryRouteDecision.HYBRID;
         }
 
-        // --- 6. Fallback
+        if (upper.startsWith("SELECT")) {
+            return QueryRouteDecision.OLAP_ONLY;
+        }
+
         return QueryRouteDecision.OLTP_ONLY;
     }
 
+    /**
+     * Ajoute un prédicat "hot" sans casser le SQL.
+     */
+    public String addHotPredicate(String sql) {
+        return addPredicate(sql, "ts > NOW() - INTERVAL '1 hour'");
+    }
+
+    /**
+     * Ajoute un prédicat "cold" sans casser le SQL.
+     */
+    public String addColdPredicate(String sql) {
+        return addPredicate(sql, "ts <= NOW() - INTERVAL '1 hour'");
+    }
+
+    private String addPredicate(String sql, String predicate) {
+        String upper = sql.toUpperCase();
+
+        if (upper.contains(" WHERE ")) {
+            return sql + " AND " + predicate;
+        }
+
+        if (upper.contains(" GROUP BY ")
+                || upper.contains(" ORDER BY ")
+                || upper.contains(" LIMIT ")) {
+            int idx = upper.indexOf(" GROUP BY ");
+            if (idx < 0) idx = upper.indexOf(" ORDER BY ");
+            if (idx < 0) idx = upper.indexOf(" LIMIT ");
+
+            return sql.substring(0, idx)
+                    + " WHERE " + predicate + " "
+                    + sql.substring(idx);
+        }
+
+        return sql + " WHERE " + predicate;
+    }
 }

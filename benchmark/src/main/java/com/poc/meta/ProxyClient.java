@@ -1,77 +1,74 @@
 package com.poc.meta;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.CollectionType;
-import com.fasterxml.jackson.databind.type.MapType;
 
-import java.io.IOException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
+import java.net.http.*;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/*
+ * Client HTTP du proxy HTAP
+ *
+ * - Permet d'envoyer des requêtes SQL uniques ou en batch
+ * - Connexion persistante HTTP/1.1 pour la performance
+ */
 public class ProxyClient {
 
-    private final String baseUrl; // ex: "http://htap-proxy:8080/proxy/query"
-    private final HttpClient client;
+    private final String baseUrl;        // URL du proxy (ex: http://localhost:8080/proxy/query)
+    private final HttpClient httpClient;
     private final ObjectMapper mapper = new ObjectMapper();
-    private final CollectionType listOfMapsType;
 
     public ProxyClient(String baseUrl) {
         this.baseUrl = baseUrl;
-        this.client = HttpClient.newBuilder()
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(2))
                 .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(5))
                 .build();
-
-        MapType mapType = mapper.getTypeFactory()
-                .constructMapType(Map.class, String.class, Object.class);
-        this.listOfMapsType = mapper.getTypeFactory()
-                .constructCollectionType(List.class, mapType);
     }
 
-    /**
-     * Exécute une requête SELECT via le proxy et renvoie la liste de lignes
-     * telle que renvoyée par ProxyController (List<Map<String,Object>>).
+    /*
+     * Envoi d'un SQL unique (OLAP ou debug)
      */
-    public List<Map<String, Object>> executeSelect(String sql) throws IOException, InterruptedException {
-        String body = callProxy(sql);
-        // Tu as montré que pour SELECT 1, le proxy renvoie: [{"?column?":1}]
-        // donc ce parsing List<Map<String,Object>> convient.
-        return mapper.readValue(body, listOfMapsType);
-    }
-
-    /**
-     * Exécute une requête d'écriture (INSERT/UPDATE/DELETE, DDL).
-     * Si tu fais évoluer ProxyController pour renvoyer rowsAffected, tu pourras
-     * parser cette info ici.
-     */
-    public void executeUpdate(String sql) throws IOException, InterruptedException {
-        callProxy(sql);
-    }
-
-    /**
-     * Envoie la requête SQL brute au proxy via GET.
-     */
-    private String callProxy(String sql) throws IOException, InterruptedException {
-        String encoded = URLEncoder.encode(sql, StandardCharsets.UTF_8);
-        URI uri = URI.create(baseUrl + "?sql=" + encoded);
+    public void executeSingle(String sql) throws Exception {
+        Map<String, String> payload = Map.of("sql", sql);
 
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(uri)
-                .GET()
-                .timeout(Duration.ofSeconds(30))
+                .uri(URI.create(baseUrl))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(payload)))
+                .timeout(Duration.ofSeconds(10))
                 .build();
 
-        HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+        httpClient.send(req, HttpResponse.BodyHandlers.discarding());
+    }
+
+    /*
+     * Envoi d'un batch de requêtes OLTP
+     *
+     * Le batch est envoyé sur /proxy/query/batch avec JSON:
+     * { "statements": [ "INSERT ...", "INSERT ..." ] }
+     */
+    public void executeBatch(List<String> statements) throws Exception {
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("statements", statements);
+
+        String jsonBody = mapper.writeValueAsString(payload);
+
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/batch"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .timeout(Duration.ofSeconds(10))
+                .build();
+
+        HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+
         if (resp.statusCode() >= 400) {
-            throw new RuntimeException("Proxy HTTP error " + resp.statusCode() + ": " + resp.body());
+            throw new RuntimeException(resp.body());
         }
-        return resp.body();
     }
 }

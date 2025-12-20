@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS orders (
     amount NUMERIC(10,2) NOT NULL
 );
 
+INSERT INTO users (name,email) VALUES ('AA', 'a@a');
 -- =========================
 -- TPC-C LIKE SCHEMA (simplifié)
 -- =========================
