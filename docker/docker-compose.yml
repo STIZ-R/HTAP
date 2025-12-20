@@ -125,6 +125,18 @@ services:
     networks:
       - htap-net
 
+  benchmark:
+    build:
+      context: ../benchmark
+    container_name: htap-benchmark
+    depends_on:
+      - proxy
+    environment:
+      # Si besoin de paramètres (nb de threads, durée, etc.)
+      PROXY_URL: http://htap-proxy:8080/proxy/query
+    networks:
+      - htap-net
+
 
   sink:
     build:

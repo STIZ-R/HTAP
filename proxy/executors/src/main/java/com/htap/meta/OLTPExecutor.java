@@ -1,7 +1,11 @@
 package com.htap.meta;
 
-import java.sql.*;
-import java.util.*;
+import com.htap.meta.types.JDBCResultMapper;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 /**
  * Exécuteur OLTP pour les requêtes transactionnelles.
@@ -14,6 +18,7 @@ public class OLTPExecutor {
 
     /**
      * Connexion JDBC vers la base OLTP (PostgreSQL).
+     * La durée de vie est gérée par ExecutorFactory, pas fermée ici.
      */
     private final Connection connection;
 
@@ -27,51 +32,32 @@ public class OLTPExecutor {
     }
 
     /**
-     * Exécute une requête SQL qui renvoie un jeu de résultats (ResultSet)
-     * et transforme ce résultat en une liste de lignes représentées par des maps.
+     * Exécute une requête SQL.
      *
-     * Chaque ligne est un Map où :
-     * - la clé est le nom de la colonne (column label),
-     * - la valeur est la valeur correspondante dans le ResultSet.
-     *
-     * @param sql requête SQL à exécuter (typiquement SELECT)
-     * @return une liste de lignes, chacune représentée par un Map colonne → valeur
-     * @throws SQLException si l'exécution de la requête échoue
+     * - SELECT  -> executeQuery + mapping ResultSet -> List<Map<String,Object>>
+     * - autres  -> executeUpdate, retourne le nombre de lignes affectées
      */
-    public List<Map<String, Object>> execute(String sql) throws SQLException {
-        try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+    public Object execute(String sql) throws Exception {
+        String trimmed = sql.trim().toUpperCase();
 
-            List<Map<String, Object>> results = new ArrayList<>();
-            ResultSetMetaData meta = rs.getMetaData();
-            int columnCount = meta.getColumnCount();
-
-            while (rs.next()) {
-                Map<String, Object> row = new HashMap<>();
-                for (int i = 1; i <= columnCount; i++) {
-                    row.put(meta.getColumnLabel(i), rs.getObject(i));
+        try (Statement stmt = connection.createStatement()) {
+            if (trimmed.startsWith("SELECT")) {
+                try (ResultSet rs = stmt.executeQuery(sql)) {
+                    return JDBCResultMapper.map(rs);
                 }
-                results.add(row);
+            } else {
+                int rows = stmt.executeUpdate(sql);
+                return rows; // ou null si tu préfères ignorer ce retour
             }
-            return results;
         }
     }
 
     /**
-     * Exécute une requête SQL sans récupérer ni exploiter de résultat.
-     *
-     * Cette méthode convient aux commandes dont on ne lit pas les lignes
-     * de retour (DDL, INSERT/UPDATE/DELETE, etc.).
-     *
-     * @param sql requête SQL à exécuter
-     * @return toujours null, aucune donnée n'est renvoyée
-     * @throws Exception si l'exécution échoue
+     * Exécution brute DML/DDL (INSERT/UPDATE/DELETE/CREATE...), sans mapping de résultat.
      */
-    public Object executeRaw(String sql) throws Exception {
+    public int executeRaw(String sql) throws SQLException {
         try (Statement stmt = connection.createStatement()) {
-            stmt.execute(sql);
-            return null;
+            return stmt.executeUpdate(sql);
         }
     }
-
 }

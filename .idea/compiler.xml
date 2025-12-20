@@ -12,6 +12,7 @@
         <module name="sink" />
         <module name="utils" />
         <module name="executors" />
+        <module name="benchmark" />
         <module name="hotcold-manager" />
       </profile>
     </annotationProcessing>
