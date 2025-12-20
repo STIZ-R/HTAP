@@ -1,0 +1,13 @@
+# Normalisation générale
+* text=auto
+
+# Scripts & fichiers exécutés dans Docker (Linux) => toujours LF
+*.sh   text eol=lf
+*.sql  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+Dockerfile text eol=lf
+
+# (optionnel) Scripts Windows => CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf

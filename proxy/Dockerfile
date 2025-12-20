@@ -27,4 +27,4 @@ ENV POSTGRES_HOST=postgres
 ENV POSTGRES_PORT=5432
 
 # Lancer Spring Boot après avoir attendu Postgres
-CMD ["/bin/sh", "-c", "/wait-for-postgres.sh"]
+CMD ["/bin/sh", "/wait-for-postgres.sh"]
