@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 public class KafkaConsumerApp {
 
     private static final int BATCH_MAX_SIZE = 500_000;
-    private static final long FLUSH_INTERVAL_MS = 2000;
+    private static final long FLUSH_INTERVAL_MS = 1000;
 
     public static void main(String[] args) throws Exception {
         String kafkaBootstrap = System.getenv().getOrDefault("KAFKA_BOOTSTRAP", "kafka:9092");
@@ -46,9 +46,16 @@ public class KafkaConsumerApp {
             return;
         }
 
+        /**
+         * debug topic en dur
+         */
         List<String> htapTopics = Arrays.asList(
-                "htap.public.users",
-                "htap.public.orders"
+                "htap.public.warehouse",
+                "htap.public.district",
+                "htap.public.customer",
+                "htap.public.start",
+                "htap.public.orders",
+                "htap.public.order_line"
         );
 
         consumer.subscribe(htapTopics);

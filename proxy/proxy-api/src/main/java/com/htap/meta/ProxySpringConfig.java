@@ -5,6 +5,8 @@ import com.htap.meta.routing.QueryRouter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import javax.sql.DataSource;
+
 /*
  * Configuration Spring du proxy HTAP.
  *
@@ -44,6 +46,8 @@ public class ProxySpringConfig {
     public QueryAnalyzer queryAnalyzer() {
         return new QueryAnalyzer();
     }
+
+
 
     /*
      * Routeur principal HTAP.

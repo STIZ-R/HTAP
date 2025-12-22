@@ -1,10 +1,10 @@
 package com.poc.meta;
 
-/*
+/**
  * Worker OLAP :
  *
- * - Envoie des SELECT périodiques
- * - Sert à tester la coexistence OLTP / OLAP
+ * - Envoie périodiquement une requête analytique.
+ * - Sert à tester la coexistence OLTP / OLAP via le proxy.
  */
 public class OLAPWorker implements Runnable {
 
@@ -19,9 +19,15 @@ public class OLAPWorker implements Runnable {
         try {
             while (true) {
                 client.executeSingle(
-                        "SELECT user_id, SUM(amount) FROM orders GROUP BY user_id LIMIT 10"
+                        "SELECT ol_w_id AS o_w_id, ol_d_id AS o_d_id, ol_o_id AS o_c_id, " +
+                                "       SUM(ol_amount) AS revenue, COUNT(*) AS lines " +
+                                "FROM order_line " +
+                                "GROUP BY ol_w_id, ol_d_id, ol_o_id " +
+                                "ORDER BY revenue DESC " +
+                                "LIMIT 10"
                 );
-                Thread.sleep(500); /* pause pour ne pas saturer */
+
+                Thread.sleep(500);
             }
         } catch (Exception ignored) {
         }

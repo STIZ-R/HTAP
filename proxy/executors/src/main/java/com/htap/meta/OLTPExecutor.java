@@ -2,62 +2,93 @@ package com.htap.meta;
 
 import com.htap.meta.types.JDBCResultMapper;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 
 /**
- * Exécuteur OLTP pour les requêtes transactionnelles.
+ * Exécuteur OLTP pour la base transactionnelle.
  *
- * Cette classe encapsule une connexion JDBC vers la base OLTP (PostgreSQL)
- * et fournit des méthodes pour exécuter des requêtes SQL, soit en renvoyant
- * les résultats structurés, soit en exécutant des commandes sans résultat.
+ * - S'appuie sur un DataSource Hikari pour PostgreSQL.
+ * - Gère des requêtes unitaires (SELECT / INSERT / UPDATE / DELETE).
+ * - Fournit un mode batch pour exécuter plusieurs statements dans une seule transaction.
  */
 public class OLTPExecutor {
 
-    /**
-     * Connexion JDBC vers la base OLTP (PostgreSQL).
-     * La durée de vie est gérée par ExecutorFactory, pas fermée ici.
-     */
-    private final Connection connection;
+    /** Source de connexions vers la base OLTP (PostgreSQL). */
+    private final DataSource dataSource;
 
     /**
-     * Construit un exécuteur OLTP à partir d'une connexion JDBC existante.
+     * Construit l'exécuteur OLTP avec un DataSource déjà configuré.
      *
-     * @param connection connexion JDBC déjà ouverte vers la base OLTP
+     * @param dataSource pool de connexions vers la base transactionnelle
      */
-    public OLTPExecutor(Connection connection) {
-        this.connection = connection;
+    public OLTPExecutor(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     /**
-     * Exécute une requête SQL.
+     * Exécute une requête SQL unique.
      *
-     * - SELECT  -> executeQuery + mapping ResultSet -> List<Map<String,Object>>
-     * - autres  -> executeUpdate, retourne le nombre de lignes affectées
+     * - Si la requête commence par SELECT → executeQuery + mapping du ResultSet.
+     * - Sinon → executeUpdate et retourne le nombre de lignes affectées.
+     *
+     * Cette méthode est pensée pour les appels "unitaires" OLTP via le proxy.
      */
     public Object execute(String sql) throws Exception {
         String trimmed = sql.trim().toUpperCase();
 
-        try (Statement stmt = connection.createStatement()) {
+        try (Connection c = dataSource.getConnection();
+             Statement stmt = c.createStatement()) {
+
             if (trimmed.startsWith("SELECT")) {
                 try (ResultSet rs = stmt.executeQuery(sql)) {
                     return JDBCResultMapper.map(rs);
                 }
             } else {
-                int rows = stmt.executeUpdate(sql);
-                return rows; // ou null si tu préfères ignorer ce retour
+                return stmt.executeUpdate(sql);
             }
         }
     }
 
     /**
-     * Exécution brute DML/DDL (INSERT/UPDATE/DELETE/CREATE...), sans mapping de résultat.
+     * Exécute une liste de statements SQL dans une seule transaction via JDBC batch.
+     *
+     * - Désactive l'auto-commit pour grouper toutes les requêtes.
+     * - Ajoute chaque statement au batch.
+     * - Exécute le batch puis fait un COMMIT.
+     *
+     * Adapté pour les gros volumes d'INSERT / UPDATE afin d'augmenter le TPS.
      */
-    public int executeRaw(String sql) throws SQLException {
-        try (Statement stmt = connection.createStatement()) {
-            return stmt.executeUpdate(sql);
+    public void executeBatch(List<String> sqls) throws Exception {
+        try (Connection c = dataSource.getConnection()) {
+            c.setAutoCommit(false);
+
+            try (Statement st = c.createStatement()) {
+                for (String sql : sqls) {
+                    st.addBatch(sql);
+                }
+                st.executeBatch();
+            }
+
+            c.commit();
+        }
+    }
+
+    /**
+     * Exécution "brute" d'un statement DML/DDL, sans mapping de résultat.
+     *
+     * - Idéal pour les INSERT / UPDATE / DELETE / CREATE... où seul
+     *   le nombre de lignes affectées compte.
+     *
+     * @return nombre de lignes affectées
+     */
+    public int executeRaw(String sql) throws Exception {
+        try (Connection c = dataSource.getConnection();
+             Statement st = c.createStatement()) {
+            return st.executeUpdate(sql);
         }
     }
 }

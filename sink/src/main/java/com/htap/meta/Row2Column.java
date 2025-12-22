@@ -64,8 +64,15 @@ public class Row2Column {
                 } else if (val.isInt()) {
                     row.put(f, val.asInt());
                 } else if (val.isLong()) {
-                    row.put(f, val.asLong());
-                } else if (val.isBinary()) {
+                    long v = val.asLong();
+                    if ("o_entry_d".equals(f)) {
+                    // Debezium MicroTimestamp = microsecondes → millis
+                    row.put(f, v / 1000);
+                    } else {
+                        row.put(f, v);
+                    }
+                }
+                else if (val.isBinary()) {
                     // Cas où Jackson donne un binaire "pur"
                     try {
                         byte[] bytes = val.binaryValue();

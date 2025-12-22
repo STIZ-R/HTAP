@@ -1,77 +1,47 @@
 package com.htap.meta;
 
-import java.sql.*;
-import java.util.*;
+import com.htap.meta.types.JDBCResultMapper;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 
 /**
- * Exécuteur OLAP pour les requêtes analytiques.
+ * Exécuteur OLAP pour la base analytique.
  *
- * Cette classe encapsule une connexion JDBC vers la base analytique (ClickHouse)
- * et fournit des méthodes pour exécuter des requêtes SQL, soit en renvoyant
- * les résultats structurés, soit en exécutant des commandes sans résultat.
+ * - Utilise un DataSource (pool Hikari) pour obtenir une connexion ClickHouse.
+ * - Exécute des requêtes SELECT et mappe le ResultSet dans une structure Java.
  */
 public class OLAPExecutor {
 
-    /**
-     * Connexion JDBC vers la base OLAP (ClickHouse).
-     */
-    private final Connection connection;
+    /** Source de connexions vers la base OLAP (ClickHouse). */
+    private final DataSource dataSource;
 
     /**
-     * Construit un exécuteur OLAP à partir d'une connexion JDBC existante.
+     * Construit l'exécuteur OLAP avec un DataSource déjà configuré.
      *
-     * @param connection connexion JDBC déjà ouverte vers la base OLAP
+     * @param dataSource pool de connexions vers la base analytique
      */
-    public OLAPExecutor(Connection connection) {
-        this.connection = connection;
+    public OLAPExecutor(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     /**
-     * Exécute une requête SQL qui renvoie un jeu de résultats (ResultSet)
-     * et transforme ce résultat en une liste de lignes représentées par des maps.
+     * Exécute une requête SQL analytique (typiquement un SELECT) et
+     * retourne le résultat sous forme d'objet Java (listes de maps).
      *
-     * Chaque ligne est un Map où :
-     * - la clé est le nom de la colonne (column label),
-     * - la valeur est la valeur correspondante dans le ResultSet.
-     *
-     * @param sql requête SQL à exécuter (typiquement SELECT)
-     * @return une liste de lignes, chacune représentée par un Map colonne → valeur
-     * @throws SQLException si l'exécution de la requête échoue
+     * - Ouvre une connexion depuis le pool.
+     * - Crée un Statement.
+     * - Exécute la requête et récupère le ResultSet.
+     * - Confie le mapping à JDBCResultMapper.
      */
-    public List<Map<String, Object>> execute(String sql) throws SQLException {
-        try (Statement stmt = connection.createStatement();
+    public Object execute(String sql) throws Exception {
+        try (Connection c = dataSource.getConnection();
+             Statement stmt = c.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
-            List<Map<String, Object>> results = new ArrayList<>();
-            ResultSetMetaData meta = rs.getMetaData();
-            int columnCount = meta.getColumnCount();
-
-            while (rs.next()) {
-                Map<String, Object> row = new HashMap<>();
-                for (int i = 1; i <= columnCount; i++) {
-                    row.put(meta.getColumnLabel(i), rs.getObject(i));
-                }
-                results.add(row);
-            }
-            return results;
+            return JDBCResultMapper.map(rs);
         }
     }
-
-    /**
-     * Exécute une requête SQL sans s'intéresser au résultat.
-     *
-     * Cette méthode est adaptée aux commandes qui ne renvoient pas de ResultSet
-     * ou dont le résultat n'est pas exploité (DDL, INSERT/UPDATE/DELETE, etc.).
-     *
-     * @param sql requête SQL à exécuter
-     * @return toujours null, aucune donnée de résultat n'est renvoyée
-     * @throws Exception si l'exécution échoue
-     */
-    public Object executeRaw(String sql) throws Exception {
-        try (Statement stmt = connection.createStatement()) {
-            stmt.execute(sql);
-            return null;
-        }
-    }
-
 }

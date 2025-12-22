@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/*
+/**
  * Contrôleur REST du proxy HTAP.
  *
  * Ce contrôleur expose une API HTTP volontairement simple :
@@ -23,17 +23,14 @@ public class ProxyController {
 
     private final QueryRouter queryRouter;
 
-    /*
+    /**
      * Injection du QueryRouter (Spring).
      */
     public ProxyController(QueryRouter queryRouter) {
         this.queryRouter = queryRouter;
     }
 
-    /*
-     * ==========================
-     * MODE SIMPLE (DEBUG)
-     * ==========================
+    /**
      *
      * GET /proxy/query?sql=SELECT+1
      *
@@ -48,10 +45,9 @@ public class ProxyController {
         return queryRouter.route(sql);
     }
 
-    /*
-     * ==========================
-     * MODE POST SQL UNIQUE
-     * ==========================
+
+
+    /**
      *
      * POST /proxy/query
      * {
@@ -67,10 +63,7 @@ public class ProxyController {
         return queryRouter.route(req.sql);
     }
 
-    /*
-     * ==========================
-     * MODE BATCH (PERFORMANCE)
-     * ==========================
+    /**
      *
      * POST /proxy/query/batch
      *
@@ -88,15 +81,7 @@ public class ProxyController {
      */
     @PostMapping("/query/batch")
     public void executeBatch(@RequestBody SqlBatchRequest req) throws Exception {
-        for (String sql : req.statements) {
-            try {
-                queryRouter.route(sql);
-            } catch (Exception e) {
-                System.err.println("Error executing SQL: " + sql);
-                e.printStackTrace();
-                throw e; // pour continuer à renvoyer 500
-            }
-        }
+        queryRouter.routeBatch(req.statements);
     }
 
 
@@ -106,14 +91,14 @@ public class ProxyController {
      * ==========================
      */
 
-    /*
+    /**
      * Payload pour SQL unique.
      */
     public static class SqlRequest {
         public String sql;
     }
 
-    /*
+    /**
      * Payload pour batch SQL.
      */
     public static class SqlBatchRequest {
