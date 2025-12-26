@@ -32,6 +32,9 @@ public class HTAPRunner {
         int batchSize   = Integer.parseInt(props.getProperty("oltp.batchSize", "800"));
         int olapThreads = Integer.parseInt(props.getProperty("olap.threads", "3"));
 
+        long durationSeconds = Long.parseLong(props.getProperty("run.durationSeconds", "300"));
+        long endTime = System.currentTimeMillis() + durationSeconds * 1000L;
+
         String oltpWorkloadPath = props.getProperty("workload.oltp", "workload/oltp.sql");
         String olapWorkloadPath = props.getProperty("workload.olap", "workload/olap.sql");
 
@@ -41,7 +44,6 @@ public class HTAPRunner {
         ProxyClient proxyClient = new ProxyClient(proxyUrl);
 
         waitForProxy(proxyClient);
-
         warmupCdc(proxyClient);
 
         try (MetricsRecorder recorder = new MetricsRecorder(metricsFile)) {
@@ -50,13 +52,11 @@ public class HTAPRunner {
                 startFreshnessMonitor(proxyClient, recorder);
             }
 
-            ExecutorService pool;
             if ("oltp_only".equalsIgnoreCase(runMode)) {
                 olapThreads = 0;
-                pool = Executors.newFixedThreadPool(oltpThreads);
-            } else {
-                pool = Executors.newFixedThreadPool(oltpThreads + olapThreads);
             }
+
+            ExecutorService pool = Executors.newFixedThreadPool(oltpThreads + olapThreads);
 
             for (int i = 0; i < olapThreads; i++) {
                 pool.submit(new OLAPWorker(proxyClient, olapQueries, recorder, i));
@@ -69,24 +69,50 @@ public class HTAPRunner {
                 ));
             }
 
-            int totalStatements = 0;
-            long maxNanos = 0;
-            for (Future<OLTPWorker.Result> f : oltpFutures) {
-                OLTPWorker.Result r = f.get();
-                totalStatements += r.statements;
-                maxNanos = Math.max(maxNanos, r.totalNanos);
+            while (System.currentTimeMillis() < endTime) {
+                Thread.sleep(1000);
             }
 
             pool.shutdown();
-            pool.awaitTermination(5, TimeUnit.MINUTES);
+            pool.awaitTermination(30, TimeUnit.SECONDS);
 
-            double seconds = maxNanos / 1_000_000_000.0;
-            double tps = totalStatements / seconds;
+            int totalStatements = 0;
+            long maxNanos = 0;
+            for (Future<OLTPWorker.Result> f : oltpFutures) {
+                try {
+                    OLTPWorker.Result r = f.get(30, TimeUnit.SECONDS);
+                    totalStatements += r.statements;
+                    maxNanos = Math.max(maxNanos, r.totalNanos);
+                } catch (TimeoutException te) {
+                    System.err.println("Timeout en attendant un OLTPWorker, on continue sans lui.");
+                } catch (InterruptedException ie) {
+                    System.err.println("Main thread interrompu pendant get(), on sort.");
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (ExecutionException ee) {
+                    System.err.println("OLTPWorker a échoué: " + ee.getCause());
+                }
+            }
 
-            System.out.printf("[OLTP via proxy][mode=%s] totalStatements=%d, time=%.2fs, TPS=%.2f%n",
-                    runMode, totalStatements, seconds, tps);
+            if (maxNanos > 0) {
+                double seconds = maxNanos / 1_000_000_000.0;
+                double tps = totalStatements / seconds;
+
+                System.out.printf("[OLTP via proxy][mode=%s] totalStatements=%d, time=%.2fs, TPS=%.2f%n",
+                        runMode, totalStatements, seconds, tps);
+            } else {
+                System.out.println("[OLTP via proxy][mode=" + runMode + "] TPS non calculable (threads interrompus ou erreurs)");
+            }
+
+            try {
+                MetricsSummary.runOnFile(metricsFile);
+            } catch (Exception e) {
+                System.err.println("Failed to run MetricsSummary: " + e.getMessage());
+            }
         }
     }
+
+
 
     private static Properties loadBenchmarkProperties() throws Exception {
         Properties props = new Properties();

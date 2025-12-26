@@ -8,8 +8,12 @@ import java.util.stream.Collectors;
 public class MetricsSummary {
 
     public static void main(String[] args) throws Exception {
-        Path csv = Path.of(args.length > 0 ? args[0] : "htap_metrics.csv");
+        String path = args.length > 0 ? args[0] : "htap_metrics.csv";
+        runOnFile(path);
+    }
 
+    public static void runOnFile(String path) throws Exception {
+        Path csv = Path.of(path);
         List<CsvMetricsAnalyzer.Record> records = CsvMetricsAnalyzer.read(csv);
 
         summarizeOltp(records);
@@ -68,23 +72,47 @@ public class MetricsSummary {
     }
 
     private static void summarizeFreshness(List<CsvMetricsAnalyzer.Record> records) {
+        long MAX_FRESHNESS_MS = 300_000; // 5 minutes
+
+        // Fenêtre de run = période où l'OLTP tourne
+        long tsMinOltp = records.stream()
+                .filter(r -> "OLTP_BATCH".equals(r.type))
+                .mapToLong(r -> r.tsClient)
+                .min().orElse(0L);
+        long tsMaxOltp = records.stream()
+                .filter(r -> "OLTP_BATCH".equals(r.type))
+                .mapToLong(r -> r.tsClient)
+                .max().orElse(Long.MAX_VALUE);
+
+        if (tsMinOltp == 0L || tsMaxOltp == Long.MAX_VALUE) {
+            System.out.println("Cannot determine OLTP window, skipping freshness summary.");
+            return;
+        }
+
         List<Long> fresh = records.stream()
                 .filter(r -> r.freshnessMs != null)
-                .filter(r -> "OLAP_QUERY".equals(r.type)) // freshness par requête
+                .filter(r -> "OLAP_QUERY".equals(r.type))
+                // on garde seulement les requêtes OLAP pendant le run OLTP
+                .filter(r -> r.tsClient >= tsMinOltp && r.tsClient <= tsMaxOltp)
+                // on filtre les valeurs aberrantes
                 .map(r -> r.freshnessMs)
+                .filter(f -> f >= 0 && f <= MAX_FRESHNESS_MS)
                 .sorted()
                 .collect(Collectors.toList());
 
         if (fresh.isEmpty()) {
-            System.out.println("No freshness values for OLAP_QUERY");
+            System.out.println("No freshness values for OLAP_QUERY in OLTP window (after filtering)");
             return;
         }
 
-        System.out.printf("Freshness (OLAP_QUERY): p50=%d ms, p95=%d ms, max=%d ms%n",
+        System.out.printf("Freshness (OLAP_QUERY, in OLTP window, <=%dms): p50=%d ms, p95=%d ms, max=%d ms%n",
+                MAX_FRESHNESS_MS,
                 percentile(fresh, 50),
                 percentile(fresh, 95),
                 fresh.get(fresh.size() - 1));
     }
+
+
 
     private static long percentile(List<Long> sortedValues, int p) {
         if (sortedValues.isEmpty()) return 0;

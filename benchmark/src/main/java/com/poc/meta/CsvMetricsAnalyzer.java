@@ -22,9 +22,17 @@ public class CsvMetricsAnalyzer {
     public static List<Record> read(Path file) throws Exception {
         List<Record> res = new ArrayList<>();
         try (BufferedReader br = new BufferedReader(new FileReader(file.toFile()))) {
-            String line = br.readLine(); // header
-            if (line == null) return res;
+            String line;
+            boolean first = true;
             while ((line = br.readLine()) != null) {
+                if (first) { // sauter l'en-tête "ts_client,phase,..."
+                    first = false;
+                    continue;
+                }
+                if (line.isBlank()) {
+                    continue;
+                }
+
                 String[] parts = line.split(",", 8); // 8 colonnes
                 if (parts.length < 7) continue;
 
@@ -42,4 +50,5 @@ public class CsvMetricsAnalyzer {
         }
         return res;
     }
+
 }
