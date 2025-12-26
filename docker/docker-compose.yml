@@ -132,10 +132,16 @@ services:
     depends_on:
       - proxy
     environment:
-      # Si besoin de paramètres (nb de threads, durée, etc.)
       PROXY_URL: http://htap-proxy:8080/proxy/query
+      METRICS_FILE: /data/metrics/htap_metrics.csv
+      # WORKLOAD_OLTP_FILE: workload/oltp.sql
+      # WORKLOAD_OLAP_FILE: workload/olap.sql
+    volumes:
+      - ../benchmark/src/main/resources/workload:/app/workload:ro
+      - ./metrics:/data/metrics
     networks:
       - htap-net
+
 
 
   sink:
