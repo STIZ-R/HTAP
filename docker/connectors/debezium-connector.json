@@ -13,6 +13,9 @@
     "publication.autocreate.mode": "filtered",
     "table.include.list": "public.*",
     "tombstones.on.delete": "false",
-    "topic.prefix": "htap"
+    "topic.prefix": "htap",
+    "poll.interval.ms": "50",
+    "max.queue.size": "4096",
+    "max.batch.size": "1024"
   }
 }

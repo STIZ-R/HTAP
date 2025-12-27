@@ -5,15 +5,21 @@ import java.sql.*;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.regex.Pattern;
 
 /**
  * Application de consommation Kafka vers ClickHouse.
+ *
+ * Optimisations fraîcheur :
+ * - poll Kafka toutes les 100 ms (au lieu de 1 s)
+ * - MAX_POLL_RECORDS plus petit
+ * - flush time-based toutes les 1 s (inchangé)
  */
 public class KafkaConsumerApp {
 
-    private static final int BATCH_MAX_SIZE = 500_000;
-    private static final long FLUSH_INTERVAL_MS = 1000;
+    // Batch max en mémoire par table avant flush forcé
+    private static final int BATCH_MAX_SIZE = 100_000;       // réduit (avant 500_000)
+    // Intervalle max entre deux flushs (time-based)
+    private static final long FLUSH_INTERVAL_MS = 800;
 
     public static void main(String[] args) throws Exception {
         String kafkaBootstrap = System.getenv().getOrDefault("KAFKA_BOOTSTRAP", "kafka:9092");
@@ -25,11 +31,12 @@ public class KafkaConsumerApp {
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBootstrap);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "sink-group");
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                "org.apache.kafka.common.serialization.StringDeserializer");
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                "org.apache.kafka.common.serialization.StringDeserializer");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, BATCH_MAX_SIZE);
-        // auto-commit pour éviter CommitFailedException
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10_000);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
@@ -46,9 +53,6 @@ public class KafkaConsumerApp {
             return;
         }
 
-        /**
-         * debug topic en dur
-         */
         List<String> htapTopics = Arrays.asList(
                 "htap.public.warehouse",
                 "htap.public.district",
@@ -59,7 +63,6 @@ public class KafkaConsumerApp {
         );
 
         consumer.subscribe(htapTopics);
-        //consumer.subscribe(Pattern.compile("^htap\\..*"));
         System.out.println("Kafka consumer démarré pour les topics: " + htapTopics);
 
         Connection conn = null;
@@ -73,7 +76,7 @@ public class KafkaConsumerApp {
             }
         }
 
-        ExecutorService insertExecutor = Executors.newFixedThreadPool(htapTopics.size() * 2);
+        ExecutorService insertExecutor = Executors.newFixedThreadPool(htapTopics.size() * 4);
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
         Map<String, BatchFlusher> tableFlushers = new HashMap<>();
@@ -89,7 +92,7 @@ public class KafkaConsumerApp {
         }, FLUSH_INTERVAL_MS, FLUSH_INTERVAL_MS, TimeUnit.MILLISECONDS);
 
         while (true) {
-            ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+            ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
 
             for (ConsumerRecord<String, String> record : records) {
                 String table = topicToTable(record.topic());
@@ -105,7 +108,6 @@ public class KafkaConsumerApp {
                     e.printStackTrace();
                 }
             }
-            // plus de commitSync(); auto-commit gère les offsets
         }
     }
 

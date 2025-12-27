@@ -159,6 +159,22 @@ services:
     networks:
       - htap-net
 
+  sink2:
+    build:
+      context: ../sink
+    container_name: htap-sink-2
+    depends_on:
+      - kafka
+      - clickhouse
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/htapdb?user=htap&password=htap
+    restart: always
+    networks:
+      - htap-net
+
+
 volumes:
   postgres_data:
   clickhouse_data:

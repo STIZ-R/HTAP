@@ -13,6 +13,7 @@ import java.util.Map;
 /**
  * Conversion générique Debezium -> Map colonne -> valeur,
  * avec support automatique des Decimal (toutes tables).
+ * Ajout de _event_ts_ms pour mesurer la fraîcheur.
  */
 public class Row2Column {
 
@@ -42,16 +43,16 @@ public class Row2Column {
         row.put("_op", op);
         row.put("_version", version);
         row.put("_deleted", "d".equals(op) ? 1 : 0);
+        // horodatage d'événement pour la fraîcheur OLAP
+        row.put("_event_ts_ms", ts);
 
         // DELETE : on simplifie, pas de PK spécifique
         if ("d".equals(op)) {
             return row;
         }
 
-        // 1) Construire une map col -> scale pour tous les Decimal
         Map<String, Integer> decimalScales = extractDecimalScales(schema);
 
-        // 2) Copier les champs métier, en décodant les Decimal via la map col->scale
         JsonNode nodeToCopy = after != null ? after : before;
         if (nodeToCopy != null) {
             Iterator<String> fieldNames = nodeToCopy.fieldNames();
@@ -66,14 +67,11 @@ public class Row2Column {
                 } else if (val.isLong()) {
                     long v = val.asLong();
                     if ("o_entry_d".equals(f)) {
-                    // Debezium MicroTimestamp = microsecondes → millis
-                    row.put(f, v / 1000);
+                        row.put(f, v / 1000);
                     } else {
                         row.put(f, v);
                     }
-                }
-                else if (val.isBinary()) {
-                    // Cas où Jackson donne un binaire "pur"
+                } else if (val.isBinary()) {
                     try {
                         byte[] bytes = val.binaryValue();
                         BigInteger bi = new BigInteger(bytes);
@@ -87,7 +85,6 @@ public class Row2Column {
                         row.put(f, null);
                     }
                 } else if (val.isTextual()) {
-                    // Cas courant Debezium: Decimal encodé en Base64 dans une string ("EJo=", "AA==", ...)
                     Integer scale = decimalScales.get(f);
                     if (scale != null) {
                         try {
@@ -95,14 +92,12 @@ public class Row2Column {
                             BigInteger bi = new BigInteger(bytes);
                             row.put(f, new BigDecimal(bi, scale));
                         } catch (Exception e) {
-                            // si ce n'est pas du Base64 valide, garder le texte brut
                             row.put(f, val.asText());
                         }
                     } else {
                         row.put(f, val.asText());
                     }
                 } else {
-                    // fallback pour d'autres types JSON (bool, double, etc.)
                     row.put(f, val.toString());
                 }
             }
