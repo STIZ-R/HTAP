@@ -12,6 +12,8 @@
         <module name="sink" />
         <module name="utils" />
         <module name="executors" />
+        <module name="benchmarks" />
+        <module name="pgwire" />
         <module name="benchmark" />
         <module name="hotcold-manager" />
       </profile>

@@ -7,6 +7,7 @@ COPY proxy-core ./proxy-core
 COPY utils ./utils
 COPY executors ./executors
 COPY proxy-api ./proxy-api
+COPY proxy-pgwire ./proxy-pgwire
 
 RUN mvn clean package -DskipTests
 

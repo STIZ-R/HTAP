@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: htap
       POSTGRES_DB: htapdb
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d
@@ -121,7 +121,8 @@ services:
       POSTGRES_URL: jdbc:postgresql://postgres:5432/htapdb?user=htap&password=htap
       CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
     ports:
-      - "8080:8080"
+      #- "8080:8080"
+      - "5432:5432"
     networks:
       - htap-net
 
