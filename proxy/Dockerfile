@@ -8,6 +8,7 @@ COPY utils ./utils
 COPY executors ./executors
 COPY proxy-api ./proxy-api
 COPY proxy-pgwire ./proxy-pgwire
+COPY proxy-jdbc ./proxy-jdbc
 
 RUN mvn clean package -DskipTests
 
