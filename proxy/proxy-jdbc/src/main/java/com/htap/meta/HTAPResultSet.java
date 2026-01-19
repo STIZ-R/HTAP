@@ -11,301 +11,97 @@ import java.util.*;
 public class HTAPResultSet implements ResultSet {
 
     private final List<Map<String,Object>> rows;
+    private final List<String> columnOrder;
     private int idx = -1;
+    private boolean closed = false;
+    private boolean lastWasNull = false;
+    private final Statement statement;
 
-    HTAPResultSet(List<Map<String,Object>> rows) {
+    public HTAPResultSet(List<Map<String,Object>> rows, Statement stmt) {
         this.rows = rows;
+        this.statement = stmt;
+        if (!rows.isEmpty()) {
+            columnOrder = new ArrayList<>(rows.get(0).keySet());
+        } else {
+            columnOrder = new ArrayList<>();
+        }
     }
 
-    @Override
-    public boolean next() {
-        return ++idx < rows.size();
+    private Map<String,Object> currentRow() throws SQLException {
+        if (idx < 0 || idx >= rows.size()) throw new SQLException("Cursor out of bounds");
+        return rows.get(idx);
     }
 
-    @Override
-    public void close() throws SQLException {
-
-    }
+    // ===== Navigation =====
 
     @Override
-    public boolean wasNull() throws SQLException {
-        return false;
-    }
-
-    @Override
-    public String getString(int columnIndex) throws SQLException {
-        return "";
-    }
-
-    @Override
-    public boolean getBoolean(int columnIndex) throws SQLException {
-        return false;
-    }
-
-    @Override
-    public byte getByte(int columnIndex) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public short getShort(int columnIndex) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public int getInt(int columnIndex) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public long getLong(int columnIndex) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public float getFloat(int columnIndex) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public double getDouble(int columnIndex) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public byte[] getBytes(int columnIndex) throws SQLException {
-        return new byte[0];
-    }
-
-    @Override
-    public Date getDate(int columnIndex) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public Time getTime(int columnIndex) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public Timestamp getTimestamp(int columnIndex) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public InputStream getAsciiStream(int columnIndex) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public InputStream getUnicodeStream(int columnIndex) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public InputStream getBinaryStream(int columnIndex) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public int getInt(String col) {
-        return ((Number) rows.get(idx).get(col)).intValue();
-    }
-
-    @Override
-    public long getLong(String col) {
-        return ((Number) rows.get(idx).get(col)).longValue();
-    }
-
-    @Override
-    public float getFloat(String columnLabel) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public double getDouble(String columnLabel) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public byte[] getBytes(String columnLabel) throws SQLException {
-        return new byte[0];
-    }
-
-    @Override
-    public Date getDate(String columnLabel) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public Time getTime(String columnLabel) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public Timestamp getTimestamp(String columnLabel) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public InputStream getAsciiStream(String columnLabel) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public InputStream getUnicodeStream(String columnLabel) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public InputStream getBinaryStream(String columnLabel) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public SQLWarning getWarnings() throws SQLException {
-        return null;
-    }
-
-    @Override
-    public void clearWarnings() throws SQLException {
-
-    }
-
-    @Override
-    public String getCursorName() throws SQLException {
-        return "";
-    }
-
-    @Override
-    public ResultSetMetaData getMetaData() throws SQLException {
-        return null;
-    }
-
-    @Override
-    public Object getObject(int columnIndex) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public String getString(String col) {
-        Object v = rows.get(idx).get(col);
-        return v == null ? null : v.toString();
-    }
-
-    @Override
-    public boolean getBoolean(String columnLabel) throws SQLException {
-        return false;
-    }
-
-    @Override
-    public byte getByte(String columnLabel) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public short getShort(String columnLabel) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public Object getObject(String col) {
-        return rows.get(idx).get(col);
-    }
-
-    @Override
-    public int findColumn(String columnLabel) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public Reader getCharacterStream(int columnIndex) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public Reader getCharacterStream(String columnLabel) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public BigDecimal getBigDecimal(int columnIndex) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public BigDecimal getBigDecimal(String columnLabel) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public boolean isBeforeFirst() throws SQLException {
-        return false;
-    }
-
-    @Override
-    public boolean isAfterLast() throws SQLException {
-        return false;
-    }
-
-    @Override
-    public boolean isFirst() throws SQLException {
-        return false;
-    }
-
-    @Override
-    public boolean isLast() throws SQLException {
+    public boolean next() throws SQLException {
+        if (idx + 1 < rows.size()) {
+            idx++;
+            return true;
+        }
         return false;
     }
 
     @Override
     public void beforeFirst() throws SQLException {
-
+        idx = -1;
     }
 
     @Override
-    public void afterLast() throws SQLException {
-
+    public void afterLast() {
+        idx = rows.size();
     }
+
 
     @Override
     public boolean first() throws SQLException {
-        return false;
+        throw new SQLFeatureNotSupportedException("Forward-only ResultSet");
     }
 
     @Override
     public boolean last() throws SQLException {
-        return false;
+        throw new SQLFeatureNotSupportedException("Forward-only ResultSet");
+    }
+
+    @Override
+    public boolean isAfterLast() throws SQLException {
+        return idx >= rows.size();
+    }
+
+    @Override
+    public boolean isBeforeFirst() throws SQLException {
+        return idx < 0;
+    }
+
+    @Override
+    public boolean isFirst() throws SQLException {
+        return idx == 0;
+    }
+
+    @Override
+    public boolean isLast() throws SQLException {
+        return idx == rows.size() - 1;
     }
 
     @Override
     public int getRow() throws SQLException {
-        return 0;
+        return idx + 1;
     }
 
     @Override
     public boolean absolute(int row) throws SQLException {
-        return false;
+        throw new SQLFeatureNotSupportedException("Forward-only ResultSet");
     }
 
     @Override
     public boolean relative(int rows) throws SQLException {
-        return false;
+        throw new SQLFeatureNotSupportedException("Forward-only ResultSet");
     }
 
     @Override
     public boolean previous() throws SQLException {
-        return false;
+        throw new SQLFeatureNotSupportedException("Forward-only ResultSet");
     }
 
     @Override
@@ -314,9 +110,10 @@ public class HTAPResultSet implements ResultSet {
     }
 
     @Override
-    public int getFetchDirection() throws SQLException {
-        return 0;
+    public int getFetchDirection() {
+        return ResultSet.FETCH_FORWARD;
     }
+
 
     @Override
     public void setFetchSize(int rows) throws SQLException {
@@ -329,13 +126,13 @@ public class HTAPResultSet implements ResultSet {
     }
 
     @Override
-    public int getType() throws SQLException {
-        return 0;
+    public int getType() {
+        return ResultSet.TYPE_FORWARD_ONLY;
     }
 
     @Override
-    public int getConcurrency() throws SQLException {
-        return 0;
+    public int getConcurrency() {
+        return ResultSet.CONCUR_READ_ONLY;
     }
 
     @Override
@@ -579,8 +376,8 @@ public class HTAPResultSet implements ResultSet {
     }
 
     @Override
-    public Statement getStatement() throws SQLException {
-        return null;
+    public Statement getStatement() {
+        return statement;
     }
 
     @Override
@@ -734,13 +531,310 @@ public class HTAPResultSet implements ResultSet {
     }
 
     @Override
-    public int getHoldability() throws SQLException {
+    public int getHoldability() {
+        return ResultSet.CLOSE_CURSORS_AT_COMMIT;
+    }
+
+
+    // ===== Accès par nom =====
+
+    @Override
+    public int getInt(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+
+        if (val == null) return 0;
+        if (val instanceof Number) return ((Number) val).intValue();
+
+        throw new SQLException("Cannot convert " + val + " to int");
+    }
+
+    @Override
+    public long getLong(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+
+        if (val == null) return 0L;
+        if (val instanceof Number) return ((Number) val).longValue();
+
+        throw new SQLException("Cannot convert " + val + " to long");
+    }
+
+
+    @Override
+    public double getDouble(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+
+        if (val == null) return 0.0;
+        if (val instanceof Number) return ((Number) val).doubleValue();
+
+        throw new SQLException("Cannot convert " + val + " to double");
+    }
+
+
+    @Override
+    public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public byte[] getBytes(String columnLabel) throws SQLException {
+        return new byte[0];
+    }
+
+    @Override
+    public Date getDate(String columnLabel) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public Time getTime(String columnLabel) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public Timestamp getTimestamp(String columnLabel) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public InputStream getAsciiStream(String columnLabel) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public InputStream getUnicodeStream(String columnLabel) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public InputStream getBinaryStream(String columnLabel) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public SQLWarning getWarnings() throws SQLException {
+        return null;
+    }
+
+    @Override
+    public void clearWarnings() throws SQLException {
+
+    }
+
+    @Override
+    public String getCursorName() throws SQLException {
+        return "";
+    }
+
+    @Override
+    public float getFloat(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+
+        if (val == null) return 0f;
+        if (val instanceof Number) return ((Number) val).floatValue();
+
+        throw new SQLException("Cannot convert " + val + " to float");
+    }
+
+
+    @Override
+    public String getString(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+        return val == null ? null : val.toString();
+    }
+
+
+    @Override
+    public boolean getBoolean(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+
+        if (val == null) return false;
+        if (val instanceof Boolean) return (Boolean) val;
+        if (val instanceof Number) return ((Number) val).intValue() != 0;
+
+        throw new SQLException("Cannot convert " + val + " to boolean");
+    }
+
+
+    @Override
+    public byte getByte(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+
+        if (val == null) return 0;
+        if (val instanceof Number) return ((Number) val).byteValue();
+        throw new SQLException("Cannot convert " + val + " to byte");
+    }
+
+    @Override
+    public short getShort(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+
+        if (val == null) return 0;
+        if (val instanceof Number) return ((Number) val).shortValue();
+        throw new SQLException("Cannot convert " + val + " to short");
+    }
+
+    @Override
+    public Object getObject(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+        return val;
+    }
+
+
+    // ===== Accès par index =====
+
+    @Override
+    public int getInt(int columnIndex) throws SQLException {
+        return getInt(getColumnName(columnIndex));
+    }
+
+    @Override
+    public long getLong(int columnIndex) throws SQLException {
+        return getLong(getColumnName(columnIndex));
+    }
+
+    @Override
+    public double getDouble(int columnIndex) throws SQLException {
+        return getDouble(getColumnName(columnIndex));
+    }
+
+    @Override
+    public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public byte[] getBytes(int columnIndex) throws SQLException {
+        return new byte[0];
+    }
+
+    @Override
+    public Date getDate(int columnIndex) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public Time getTime(int columnIndex) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public Timestamp getTimestamp(int columnIndex) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public InputStream getAsciiStream(int columnIndex) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public InputStream getUnicodeStream(int columnIndex) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public InputStream getBinaryStream(int columnIndex) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public float getFloat(int columnIndex) throws SQLException {
+        return getFloat(getColumnName(columnIndex));
+    }
+
+    @Override
+    public String getString(int columnIndex) throws SQLException {
+        return getString(getColumnName(columnIndex));
+    }
+
+    @Override
+    public boolean getBoolean(int columnIndex) throws SQLException {
+        return getBoolean(getColumnName(columnIndex));
+    }
+
+    @Override
+    public byte getByte(int columnIndex) throws SQLException {
         return 0;
     }
 
     @Override
-    public boolean isClosed() throws SQLException {
-        return false;
+    public short getShort(int columnIndex) throws SQLException {
+        return 0;
+    }
+
+    @Override
+    public Object getObject(int columnIndex) throws SQLException {
+        return getObject(getColumnName(columnIndex));
+    }
+
+    private String getColumnName(int columnIndex) throws SQLException {
+        if (columnIndex < 1 || columnIndex > columnOrder.size())
+            throw new SQLException("Invalid column index " + columnIndex);
+        return columnOrder.get(columnIndex - 1);
+    }
+
+    // ===== Méthodes "boilerplate" minimal pour JDBC =====
+
+    @Override
+    public void close() {
+        closed = true;
+    }
+    @Override
+    public boolean wasNull() {
+        return lastWasNull;
+    }
+    @Override
+    public ResultSetMetaData getMetaData() {
+        return new HTAPResultSetMetaData(columnOrder);
+    }
+    @Override public int findColumn(String columnLabel) throws SQLException {
+        int idx = columnOrder.indexOf(columnLabel);
+        if (idx == -1) throw new SQLException("Unknown column " + columnLabel);
+        return idx + 1;
+    }
+
+    @Override
+    public Reader getCharacterStream(int columnIndex) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public Reader getCharacterStream(String columnLabel) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public BigDecimal getBigDecimal(int columnIndex) throws SQLException {
+        return null;
+    }
+
+    @Override
+    public BigDecimal getBigDecimal(String columnLabel) throws SQLException {
+        Object val = currentRow().get(columnLabel);
+        lastWasNull = (val == null);
+
+        if (val == null) return null;
+        if (val instanceof BigDecimal) return (BigDecimal) val;
+        if (val instanceof Number)
+            return BigDecimal.valueOf(((Number) val).doubleValue());
+
+        throw new SQLException("Cannot convert " + val + " to BigDecimal");
+    }
+
+
+
+    @Override
+    public boolean isClosed() {
+        return closed;
     }
 
     @Override
@@ -955,23 +1049,19 @@ public class HTAPResultSet implements ResultSet {
 
     @Override
     public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
-        return null;
+        Object val = getObject(columnIndex);
+        if (val == null) return null;
+        if (type.isInstance(val)) return type.cast(val);
+        throw new SQLException("Cannot convert " + val.getClass() + " to " + type);
     }
+
 
     @Override
     public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
         return null;
     }
 
-    @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException {
-        return null;
-    }
+    @Override public <T> T unwrap(Class<T> iface) throws SQLException { return null; }
+    @Override public boolean isWrapperFor(Class<?> iface) throws SQLException { return false; }
 
-    @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        return false;
-    }
-
-    /* index-based getters idem */
 }

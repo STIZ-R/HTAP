@@ -9,12 +9,12 @@ import java.util.List;
  */
 public class OLAPWorker implements Runnable {
 
-    private final ProxyClient client;
+    private final ProxyClientInterface client;
     private final List<String> olapQueries;
     private final MetricsRecorder recorder;
     private final int workerId;
 
-    public OLAPWorker(ProxyClient client,
+    public OLAPWorker(ProxyClientInterface client,
                       List<String> olapQueries,
                       MetricsRecorder recorder,
                       int workerId) {

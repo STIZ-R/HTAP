@@ -1,0 +1,7 @@
+com/htap/meta/HTAPDriver.class
+com/htap/meta/HTAPPreparedStatement.class
+com/htap/meta/HTAPResultSet.class
+com/htap/meta/HTAPStatement.class
+com/htap/meta/Main.class
+com/htap/meta/HttpClient.class
+com/htap/meta/HTAPConnection.class

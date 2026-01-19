@@ -7,6 +7,7 @@ import java.net.URL;
 import java.sql.*;
 import java.sql.Date;
 import java.util.*;
+import java.util.regex.Matcher;
 
 public class HTAPPreparedStatement extends HTAPStatement implements PreparedStatement {
 
@@ -74,8 +75,8 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
     }
 
     @Override
-    public void clearParameters() throws SQLException {
-
+    public void clearParameters() {
+        params.clear();
     }
 
     @Override
@@ -90,8 +91,21 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
 
     @Override
     public boolean execute() throws SQLException {
-        return false;
+        String boundSql = bind();
+        Object res = HttpClient.post(conn.endpoint, "/proxy/query", boundSql);
+        List<Map<String,Object>> rows = HTAPStatement.adaptResult(res);
+
+        if (rows != null && !rows.isEmpty()) {
+            resultSet = new HTAPResultSet(rows, this);
+            updateCount = -1;
+            return true;   // result set
+        }
+
+        resultSet = null;
+        updateCount = (res instanceof Number) ? ((Number) res).intValue() : 0;
+        return false;      // update count
     }
+
 
 
 
@@ -124,7 +138,7 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
 
     @Override
     public ResultSetMetaData getMetaData() throws SQLException {
-        return null;
+        return new HTAPResultSetMetaData(Collections.emptyList());
     }
 
     @Override
@@ -153,9 +167,11 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
     }
 
     @Override
-    public ParameterMetaData getParameterMetaData() throws SQLException {
-        return null;
+    public ParameterMetaData getParameterMetaData() {
+        long count = template.chars().filter(c -> c == '?').count();
+        return new HTAPParameterMetaData((int) count);
     }
+
 
     @Override
     public void setRowId(int parameterIndex, RowId x) throws SQLException {
@@ -253,9 +269,16 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
     }
 
     @Override
-    public ResultSet executeQuery() {
-        return super.executeQuery(bind());
+    public ResultSet executeQuery() throws SQLException {
+        String boundSql = bind();
+        Object res = HttpClient.post(conn.endpoint, "/proxy/query", boundSql);
+        List<Map<String,Object>> rows = HTAPStatement.adaptResult(res);
+        resultSet = new HTAPResultSet(rows, this);
+        updateCount = -1;   // IMPORTANT JDBC
+        return resultSet;
+
     }
+
 
     @Override
     public int executeUpdate() throws SQLException {
@@ -285,13 +308,16 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
     private String bind() {
         String sql = template;
         for (int i = 1; i <= params.size(); i++) {
-            sql = sql.replaceFirst("\\?", params.get(i).toString());
+            Object v = params.get(i);
+            sql = sql.replaceFirst("\\?", v == null ? "null" : Matcher.quoteReplacement(v.toString()));
         }
         return sql;
     }
 
+
+
     @Override
-    public void close() throws SQLException {
+    public void close() {
 
     }
 
@@ -352,13 +378,15 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
 
     @Override
     public ResultSet getResultSet() throws SQLException {
-        return null;
+        return resultSet;
     }
+
 
     @Override
     public int getUpdateCount() throws SQLException {
-        return 0;
+        return updateCount;
     }
+
 
     @Override
     public boolean getMoreResults() throws SQLException {
@@ -413,7 +441,7 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
 
     @Override
     public Connection getConnection() throws SQLException {
-        return null;
+        return conn;
     }
 
     @Override
@@ -457,7 +485,7 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
     }
 
     @Override
-    public int getResultSetHoldability() throws SQLException {
+    public int getResultSetHoldability() {
         return 0;
     }
 

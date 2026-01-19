@@ -55,7 +55,8 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_NUM_PARTITIONS: 6
     ports:
       - "9092:9092"
     networks:
@@ -121,19 +122,23 @@ services:
       POSTGRES_URL: jdbc:postgresql://postgres:5432/htapdb?user=htap&password=htap
       CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
     ports:
-      #- "8080:8080"
-      - "5432:5432"
+      - "8080:8080"
+      #- "5432:5432"
     networks:
       - htap-net
 
   benchmark:
     build:
-      context: ../benchmark
+      context: ../
+      dockerfile: benchmark/Dockerfile
+      args:
+        - PROXY_PATH=../proxy
     container_name: htap-benchmark
     depends_on:
       - proxy
     environment:
       PROXY_URL: http://htap-proxy:8080/proxy/query
+      JDBC_URL: jdbc:htap:http://htap-proxy:8080
       METRICS_FILE: /data/metrics/htap_metrics.csv
       # WORKLOAD_OLTP_FILE: workload/oltp.sql
       # WORKLOAD_OLAP_FILE: workload/olap.sql
@@ -160,20 +165,20 @@ services:
     networks:
       - htap-net
 
-  sink2:
-    build:
-      context: ../sink
-    container_name: htap-sink-2
-    depends_on:
-      - kafka
-      - clickhouse
-    environment:
-      KAFKA_BOOTSTRAP: kafka:9092
-      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
-      POSTGRES_URL: jdbc:postgresql://postgres:5432/htapdb?user=htap&password=htap
-    restart: always
-    networks:
-      - htap-net
+#  sink2:
+#    build:
+#      context: ../sink
+#    container_name: htap-sink-2
+#    depends_on:
+#      - kafka
+#      - clickhouse
+#    environment:
+#      KAFKA_BOOTSTRAP: kafka:9092
+#      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
+#      POSTGRES_URL: jdbc:postgresql://postgres:5432/htapdb?user=htap&password=htap
+#    restart: always
+#    networks:
+#      - htap-net
 
 
 volumes:

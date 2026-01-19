@@ -17,7 +17,7 @@ import java.util.Map;
  * - Permet d'envoyer des requêtes SQL uniques ou en batch.
  * - Fournit quelques helpers pour récupérer des scalaires.
  */
-public class ProxyClient {
+public class ProxyClient implements ProxyClientInterface{
 
     private final String baseUrl;
     private final HttpClient httpClient;

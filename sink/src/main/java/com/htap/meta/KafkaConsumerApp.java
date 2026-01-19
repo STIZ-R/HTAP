@@ -36,7 +36,7 @@ public class KafkaConsumerApp {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
                 "org.apache.kafka.common.serialization.StringDeserializer");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 10_000);
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 30_000);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
@@ -76,7 +76,7 @@ public class KafkaConsumerApp {
             }
         }
 
-        ExecutorService insertExecutor = Executors.newFixedThreadPool(htapTopics.size() * 4);
+        ExecutorService insertExecutor = Executors.newFixedThreadPool(htapTopics.size() * 8);
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
         Map<String, BatchFlusher> tableFlushers = new HashMap<>();

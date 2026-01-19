@@ -14,21 +14,23 @@ public class HTAPDriver implements Driver {
     }
 
     @Override
-    public boolean acceptsURL(String url) {
-        return url.startsWith("jdbc:htap:");
+    public Connection connect(String url, Properties info) throws SQLException {
+        if (!acceptsURL(url)) return null;
+        return new HTAPConnection(url);
     }
 
     @Override
-    public Connection connect(String url, Properties info) {
-        // jdbc:htap:http://localhost:8080
-        String endpoint = url.substring("jdbc:htap:".length());
-        return new HTAPConnection(endpoint);
+    public boolean acceptsURL(String url) {
+        return url != null && url.startsWith("jdbc:htap:");
     }
 
-    /* Boilerplate inutile pour HTAPBench */
-    public int getMajorVersion() { return 1; }
-    public int getMinorVersion() { return 0; }
-    public boolean jdbcCompliant() { return false; }
-    public DriverPropertyInfo[] getPropertyInfo(String u, Properties p) { return new DriverPropertyInfo[0]; }
-    public java.util.logging.Logger getParentLogger() { return null; }
+    @Override public int getMajorVersion() { return 1; }
+    @Override public int getMinorVersion() { return 0; }
+    @Override public boolean jdbcCompliant() { return false; }
+    @Override public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) {
+        return new DriverPropertyInfo[0];
+    }
+    @Override public java.util.logging.Logger getParentLogger() {
+        return java.util.logging.Logger.getGlobal();
+    }
 }

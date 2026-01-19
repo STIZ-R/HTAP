@@ -7,29 +7,51 @@ public class HTAPStatement implements Statement {
 
     protected final HTAPConnection conn;
     protected final List<String> batch = new ArrayList<>();
+    protected HTAPResultSet resultSet;
+    protected int updateCount = 0;
+
 
     HTAPStatement(HTAPConnection conn) {
         this.conn = conn;
     }
 
+    // Dans HTAPStatement.java (hérité par Prepared)
+    public static List<Map<String,Object>> adaptResult(Object res) throws SQLException {
+        if (res instanceof List) return (List<Map<String,Object>>) res;
+        if (res instanceof Number) {
+            List<Map<String,Object>> rows = new ArrayList<>();
+            Map<String,Object> row = new HashMap<>();
+            row.put("result", res);
+            rows.add(row);
+            return rows;
+        }
+        if (res == null) return new ArrayList<>();
+        throw new SQLException("Unexpected: " + res.getClass());
+    }
 
 
     @Override
-    public ResultSet executeQuery(String sql) {
+    public ResultSet executeQuery(String sql) throws SQLException {
         Object res = HttpClient.post(conn.endpoint, "/proxy/query", sql);
-        return new HTAPResultSet((List<Map<String,Object>>) res);
+        List<Map<String,Object>> rows = adaptResult(res);
+        this.resultSet = new HTAPResultSet(rows, this);
+        return this.resultSet;
     }
 
     @Override
     public int executeUpdate(String sql) {
         HttpClient.post(conn.endpoint, "/proxy/query", sql);
-        return 1;
+        updateCount = 1;
+        return updateCount;
+
     }
 
     @Override
-    public void close() throws SQLException {
-
+    public void close() {
+        resultSet = null;
+        batch.clear();
     }
+
 
     @Override
     public int getMaxFieldSize() throws SQLException {
@@ -87,19 +109,25 @@ public class HTAPStatement implements Statement {
     }
 
     @Override
-    public boolean execute(String sql) {
-        executeQuery(sql);
-        return true;
+    public boolean execute(String sql) throws SQLException {
+        Object res = HttpClient.post(conn.endpoint, "/proxy/query", sql);
+        List<Map<String,Object>> rows = adaptResult(res);
+        if (rows != null && !rows.isEmpty()) {
+            this.resultSet = new HTAPResultSet(rows, this);
+            return true;  // a resultset
+        }
+        this.updateCount = (res instanceof Number) ? ((Number)res).intValue() : 0;
+        return false;  // update count
     }
 
     @Override
     public ResultSet getResultSet() throws SQLException {
-        return null;
+        return resultSet;
     }
 
     @Override
     public int getUpdateCount() throws SQLException {
-        return 0;
+        return updateCount;
     }
 
     @Override
@@ -129,12 +157,12 @@ public class HTAPStatement implements Statement {
 
     @Override
     public int getResultSetConcurrency() throws SQLException {
-        return 0;
+        return ResultSet.CONCUR_READ_ONLY;
     }
 
     @Override
     public int getResultSetType() throws SQLException {
-        return 0;
+        return ResultSet.TYPE_FORWARD_ONLY;
     }
 
     @Override
@@ -158,7 +186,7 @@ public class HTAPStatement implements Statement {
 
     @Override
     public Connection getConnection() throws SQLException {
-        return null;
+        return conn;
     }
 
     @Override
@@ -202,13 +230,14 @@ public class HTAPStatement implements Statement {
     }
 
     @Override
-    public int getResultSetHoldability() throws SQLException {
-        return 0;
+    public int getResultSetHoldability() {
+        return ResultSet.CLOSE_CURSORS_AT_COMMIT;
     }
+
 
     @Override
     public boolean isClosed() throws SQLException {
-        return false;
+        return conn.isClosed();
     }
 
     @Override

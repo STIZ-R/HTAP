@@ -6,7 +6,7 @@ import java.util.concurrent.Callable;
 
 public class OLTPWorker implements Callable<OLTPWorker.Result> {
 
-    private final ProxyClient client;
+    private final ProxyClientInterface client;
     private final List<String> templates;
     private final int totalTx;
     private final int batchSize;
@@ -14,7 +14,7 @@ public class OLTPWorker implements Callable<OLTPWorker.Result> {
     private final MetricsRecorder recorder;
     private final String phase;
 
-    public OLTPWorker(ProxyClient client,
+    public OLTPWorker(ProxyClientInterface client,
                       List<String> templates,
                       int totalTx,
                       int batchSize,

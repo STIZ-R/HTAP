@@ -42,6 +42,15 @@ public class HTAPRunner {
         List<String> olapQueries   = WorkloadLoader.loadSqlFile(olapWorkloadPath);
 
         ProxyClient proxyClient = new ProxyClient(proxyUrl);
+        //ProxyClientInterface proxyClient = new JdbcProxyClient("jdbc:htap:http://htap-proxy:8080");
+//        String jdbcUrl = System.getenv().getOrDefault(
+//                "JDBC_URL",
+//                "jdbc:htap:http://htap-proxy:8080"
+//        );
+//        System.out.println("Using JDBC_URL=" + jdbcUrl);
+//
+//        ProxyClientInterface proxyClient = new JdbcProxyClient(jdbcUrl);
+
 
         waitForProxy(proxyClient);
         warmupCdc(proxyClient);
@@ -125,7 +134,7 @@ public class HTAPRunner {
         return props;
     }
 
-    private static void waitForProxy(ProxyClient proxyClient) throws InterruptedException {
+    private static void waitForProxy(ProxyClientInterface proxyClient) throws InterruptedException {
         int maxAttempts = 60;
         for (int i = 0; i < maxAttempts; i++) {
             try {
@@ -140,7 +149,8 @@ public class HTAPRunner {
         throw new RuntimeException("Proxy did not become ready after " + maxAttempts + " seconds");
     }
 
-    private static void warmupCdc(ProxyClient proxyClient) throws Exception {
+
+    private static void warmupCdc(ProxyClientInterface proxyClient) throws Exception {
         System.out.println("Starting CDC warm-up...");
 
         String markerSql =
@@ -150,15 +160,15 @@ public class HTAPRunner {
         proxyClient.executeSingle(markerSql);
 
         long start = System.currentTimeMillis();
-        long timeoutMs = 60_000;
+        long timeoutMs = 600_000;
 
         while (true) {
             try {
                 int cnt = proxyClient.executeScalarInt(
-                        "SELECT count(*) AS cnt " +
-                                "FROM start " +
-                                "WHERE id = 1 AND debug = 42"
+                        "SELECT count(*) AS cnt FROM start WHERE id=1 AND debug=42" +
+                                " AND _deleted=0"  // ← Ignore soft-deletes sink
                 );
+
                 if (cnt > 0) {
                     long elapsed = System.currentTimeMillis() - start;
                     System.out.printf("CDC warm-up done (start): marker visible in %d ms%n", elapsed);
@@ -173,7 +183,7 @@ public class HTAPRunner {
         }
     }
 
-    private static void startFreshnessMonitor(ProxyClient proxyClient, MetricsRecorder recorder) {
+    private static void startFreshnessMonitor(ProxyClientInterface proxyClient, MetricsRecorder recorder) {
         Thread t = new Thread(() -> {
             try {
                 while (true) {
