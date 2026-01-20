@@ -20,6 +20,12 @@ public class HTAPRunner {
                 "http://localhost:8080/proxy/query"
         );
         System.out.println("Using PROXY_URL=" + proxyUrl);
+//        String jdbcUrl = System.getenv().getOrDefault(
+//                "JDBC_URL",
+//                "jdbc:htap:http://htap-proxy:8080"
+//        );
+//        System.out.println("Using JDBC_URL=" + jdbcUrl);
+
 
         String metricsFile = System.getenv().getOrDefault(
                 "METRICS_FILE",
@@ -42,7 +48,7 @@ public class HTAPRunner {
         List<String> olapQueries   = WorkloadLoader.loadSqlFile(olapWorkloadPath);
 
         ProxyClient proxyClient = new ProxyClient(proxyUrl);
-        //ProxyClientInterface proxyClient = new JdbcProxyClient("jdbc:htap:http://htap-proxy:8080");
+//        ProxyClientInterface proxyClient = new JdbcProxyClient(jdbcUrl);
 //        String jdbcUrl = System.getenv().getOrDefault(
 //                "JDBC_URL",
 //                "jdbc:htap:http://htap-proxy:8080"

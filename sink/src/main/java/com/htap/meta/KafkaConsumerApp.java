@@ -17,9 +17,9 @@ import java.util.concurrent.*;
 public class KafkaConsumerApp {
 
     // Batch max en mémoire par table avant flush forcé
-    private static final int BATCH_MAX_SIZE = 100_000;       // réduit (avant 500_000)
+    private static final int BATCH_MAX_SIZE = 30_000;       // réduit (avant 500_000)
     // Intervalle max entre deux flushs (time-based)
-    private static final long FLUSH_INTERVAL_MS = 800;
+    private static final long FLUSH_INTERVAL_MS = 500;
 
     public static void main(String[] args) throws Exception {
         String kafkaBootstrap = System.getenv().getOrDefault("KAFKA_BOOTSTRAP", "kafka:9092");
@@ -38,6 +38,7 @@ public class KafkaConsumerApp {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 30_000);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
+        props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, 100 * 1024 * 1024);
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
 

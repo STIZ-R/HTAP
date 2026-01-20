@@ -55,7 +55,7 @@ services:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 #pb avec rep à 2 (le leader jamais élu)
       KAFKA_NUM_PARTITIONS: 6
     ports:
       - "9092:9092"
@@ -80,6 +80,9 @@ services:
       VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
       INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      #CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      #OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      #STATUS_STORAGE_REPLICATION_FACTOR: 1
     volumes:
       - ./connectors:/kafka/connectors
     networks:
