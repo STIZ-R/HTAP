@@ -16,8 +16,12 @@ public class HTAPDriver implements Driver {
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
         if (!acceptsURL(url)) return null;
-        return new HTAPConnection(url);
+
+        String endpoint = url.substring("jdbc:htap:".length());
+
+        return new HTAPConnection(endpoint);
     }
+
 
     @Override
     public boolean acceptsURL(String url) {

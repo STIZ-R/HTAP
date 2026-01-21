@@ -15,6 +15,11 @@ public class HTAPConnection implements Connection {
         this.endpoint = endpoint;
     }
 
+    private void checkOpen() throws SQLException {
+        if (closed) throw new SQLException("Connection is closed");
+    }
+
+
     @Override
     public Statement createStatement() {
         return new HTAPStatement(this);
@@ -31,17 +36,28 @@ public class HTAPConnection implements Connection {
     }
 
     @Override
-    public String nativeSQL(String sql) throws SQLException {
-        return "";
+    public String nativeSQL(String sql) {
+        return sql;
     }
 
+
     @Override
-    public void setAutoCommit(boolean autoCommit) {
+    public void setAutoCommit(boolean autoCommit) throws SQLException {
+        checkOpen();
+
+        if (this.autoCommit == autoCommit) return;
+
         this.autoCommit = autoCommit;
+
         if (!autoCommit) {
+            // début transaction
             HttpClient.post(endpoint, "/proxy/query", "BEGIN");
+        } else {
+            // fin implicite transaction
+            HttpClient.post(endpoint, "/proxy/query", "COMMIT");
         }
     }
+
 
     @Override
     public boolean getAutoCommit() throws SQLException {
@@ -50,19 +66,36 @@ public class HTAPConnection implements Connection {
 
 
     @Override
-    public void commit() {
-        HttpClient.post(endpoint, "/proxy/query", "COMMIT");
+    public void commit() throws SQLException {
+        checkOpen();
+
+        if (!autoCommit) {
+            HttpClient.post(endpoint, "/proxy/query", "COMMIT");
+            // redémarre une transaction implicite
+            HttpClient.post(endpoint, "/proxy/query", "BEGIN");
+        }
     }
 
     @Override
-    public void rollback() {
-        HttpClient.post(endpoint, "/proxy/query", "ROLLBACK");
+    public void rollback() throws SQLException {
+        checkOpen();
+
+        if (!autoCommit) {
+            HttpClient.post(endpoint, "/proxy/query", "ROLLBACK");
+            HttpClient.post(endpoint, "/proxy/query", "BEGIN");
+        }
     }
 
     @Override
     public void close() {
-        closed = true;
+        if (!closed) {
+            try {
+                HttpClient.post(endpoint, "/proxy/close", "");
+            } catch (Exception ignore) {}
+            closed = true;
+        }
     }
+
 
     @Override
     public boolean isClosed() {
@@ -171,9 +204,10 @@ public class HTAPConnection implements Connection {
     }
 
     @Override
-    public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        return null;
+    public Statement createStatement(int t, int c, int h) {
+        return createStatement();
     }
+
 
     @Override
     public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
@@ -221,7 +255,7 @@ public class HTAPConnection implements Connection {
     }
 
     @Override
-    public boolean isValid(int timeout) throws SQLException {
+    public boolean isValid(int timeout) {
         try {
             Object res = HttpClient.post(endpoint, "/proxy/query", "SELECT 1");
             return res != null;
@@ -229,6 +263,7 @@ public class HTAPConnection implements Connection {
             return false;
         }
     }
+
 
 
     @Override

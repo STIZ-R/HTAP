@@ -86,8 +86,15 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
 
     @Override
     public void setObject(int parameterIndex, Object x) throws SQLException {
-
+        if (x == null) {
+            params.put(parameterIndex, "null");
+        } else if (x instanceof String) {
+            params.put(parameterIndex, "'" + x + "'");
+        } else {
+            params.put(parameterIndex, x);
+        }
     }
+
 
     @Override
     public boolean execute() throws SQLException {
@@ -282,13 +289,16 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
 
     @Override
     public int executeUpdate() throws SQLException {
-        return 0;
+        execute();
+        return updateCount;
     }
+
 
     @Override
-    public void setNull(int parameterIndex, int sqlType) throws SQLException {
-
+    public void setNull(int parameterIndex, int sqlType) {
+        params.put(parameterIndex, "null");
     }
+
 
     @Override
     public void setBoolean(int parameterIndex, boolean x) throws SQLException {
@@ -431,7 +441,7 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
 
     @Override
     public void clearBatch() {
-
+        batch.clear();
     }
 
     @Override

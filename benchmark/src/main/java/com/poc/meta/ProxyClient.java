@@ -134,4 +134,9 @@ public class ProxyClient implements ProxyClientInterface{
         return odt.toInstant().toEpochMilli();
     }
 
+    @Override
+    public void close() throws Exception {
+
+    }
+
 }

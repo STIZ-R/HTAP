@@ -317,13 +317,14 @@ public class HTAPDatabaseMetaData implements DatabaseMetaData {
     public boolean allTablesAreSelectable() { return true; }
 
     @Override
-    public String getURL() throws SQLException {
-        return "";
+    public String getURL() {
+        return conn.endpoint;
     }
 
+
     @Override
-    public String getUserName() throws SQLException {
-        return "";
+    public String getUserName() {
+        return "proxy";
     }
 
     @Override

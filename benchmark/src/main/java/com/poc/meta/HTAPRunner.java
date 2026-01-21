@@ -15,16 +15,7 @@ public class HTAPRunner {
 
         String runMode = props.getProperty("run.mode", "htap").trim(); // oltp_only ou htap
 
-        String proxyUrl = System.getenv().getOrDefault(
-                "PROXY_URL",
-                "http://localhost:8080/proxy/query"
-        );
-        System.out.println("Using PROXY_URL=" + proxyUrl);
-//        String jdbcUrl = System.getenv().getOrDefault(
-//                "JDBC_URL",
-//                "jdbc:htap:http://htap-proxy:8080"
-//        );
-//        System.out.println("Using JDBC_URL=" + jdbcUrl);
+
 
 
         String metricsFile = System.getenv().getOrDefault(
@@ -32,6 +23,10 @@ public class HTAPRunner {
                 props.getProperty("metrics.file", "htap_metrics.csv")
         );
         System.out.println("Using METRICS_FILE=" + metricsFile);
+
+        String clientMode = props.getProperty("client.mode", "jdbc").trim().toLowerCase();
+        System.out.println("Using client.mode=" + clientMode);
+
 
         int oltpThreads = Integer.parseInt(props.getProperty("oltp.threads", "7"));
         int txPerThread = Integer.parseInt(props.getProperty("oltp.txPerThread", "2000"));
@@ -43,33 +38,123 @@ public class HTAPRunner {
 
         String oltpWorkloadPath = props.getProperty("workload.oltp", "workload/oltp.sql");
         String olapWorkloadPath = props.getProperty("workload.olap", "workload/olap.sql");
+        String populatePath = props.getProperty("populate.oltp", "workload/populate.sql");
+        String olapOnlyPath = props.getProperty("workload.olap_only", "workload/olap_only.sql");
 
-        List<String> oltpTemplates = WorkloadLoader.loadSqlFile(oltpWorkloadPath);
-        List<String> olapQueries   = WorkloadLoader.loadSqlFile(olapWorkloadPath);
+        boolean oltpOnly = "oltp_only".equalsIgnoreCase(runMode);
+        boolean htapMode = "htap".equalsIgnoreCase(runMode);
+        boolean olapOnly = "olap_only".equalsIgnoreCase(runMode);
 
-        ProxyClient proxyClient = new ProxyClient(proxyUrl);
-//        ProxyClientInterface proxyClient = new JdbcProxyClient(jdbcUrl);
-//        String jdbcUrl = System.getenv().getOrDefault(
-//                "JDBC_URL",
-//                "jdbc:htap:http://htap-proxy:8080"
-//        );
-//        System.out.println("Using JDBC_URL=" + jdbcUrl);
-//
-//        ProxyClientInterface proxyClient = new JdbcProxyClient(jdbcUrl);
+        System.out.println("====================================");
+        System.out.println(" HTAP Benchmark Runner");
+        System.out.println(" run.mode   = " + runMode);
+        System.out.println(" client.mode= " + clientMode);
+        System.out.println("====================================");
+
+        List<String> oltpTemplates = Collections.emptyList();
+        List<String> olapQueries   = Collections.emptyList();
+        List<String> populateSql   = Collections.emptyList();
+
+        if (!olapOnly) {
+            oltpTemplates = WorkloadLoader.loadSqlFile(oltpWorkloadPath);
+            olapQueries   = WorkloadLoader.loadSqlFile(olapWorkloadPath);
+        } else {
+            // OLAP_ONLY : on charge populate + requêtes OLAP_ONLY
+            if (populatePath == null || olapOnlyPath == null) {
+                throw new IllegalArgumentException("populate.oltp et workload.olap_only doivent être définis en olap_only");
+            }
+            populateSql = WorkloadLoader.loadSqlFile(populatePath);
+            olapQueries = WorkloadLoader.loadSqlFile(olapOnlyPath);
+        }
+
+
+        ProxyClientInterface proxyClient;
+
+        if ("api".equals(clientMode)) {
+
+            String proxyUrl = System.getenv().getOrDefault(
+                    "PROXY_URL",
+                    "http://htap-proxy:8080"
+            );
+            System.out.println("Using PROXY_URL=" + proxyUrl);
+
+            proxyClient = new ProxyClient(proxyUrl);
+
+        } else { // default = jdbc
+
+            String jdbcUrl = System.getenv().getOrDefault(
+                    "JDBC_URL",
+                    "jdbc:htap:http://htap-proxy:8080"
+            );
+            System.out.println("Using JDBC_URL=" + jdbcUrl);
+
+            proxyClient = new JdbcProxyClient(jdbcUrl);
+        }
+
 
 
         waitForProxy(proxyClient);
         warmupCdc(proxyClient);
 
+        // =======================
+        // MODE OLAP_ONLY
+        // =======================
+        if ("olap_only".equalsIgnoreCase(runMode)) {
+
+            System.out.println("=== OLAP_ONLY MODE : populating OLTP first ===");
+
+            // 1. Charger le fichier populate.sql
+            List<String> populateStatements = WorkloadLoader.loadSqlFile(populatePath);
+
+            System.out.println("Populate statements loaded: " + populateStatements.size());
+
+            // 2. Envoyer en batch (important !)
+            int batchSizePopulate = 1000;
+            List<String> batch = new ArrayList<>();
+
+            for (String sql : populateStatements) {
+                batch.add(sql);
+                if (batch.size() >= batchSizePopulate) {
+                    proxyClient.executeBatch(batch);
+                    batch.clear();
+                }
+            }
+            if (!batch.isEmpty()) {
+                proxyClient.executeBatch(batch);
+            }
+
+            System.out.println("Populate finished, waiting for CDC to catch up...");
+
+            // 3. Attendre que ClickHouse voie des données (barrière simple)
+            waitUntilOlapHasData(proxyClient);
+
+            // 4. OLAP ONLY → pas de threads OLTP
+            oltpThreads = 0;
+
+            // 5. Charger les requêtes OLAP_ONLY
+            olapQueries = WorkloadLoader.loadSqlFile(olapOnlyPath);
+
+            System.out.println("OLAP_ONLY queries loaded: " + olapQueries.size());
+        }
+
+
+
         try (MetricsRecorder recorder = new MetricsRecorder(metricsFile)) {
 
-            if (!"oltp_only".equalsIgnoreCase(runMode)) {
+            if (htapMode) {
                 startFreshnessMonitor(proxyClient, recorder);
             }
 
-            if ("oltp_only".equalsIgnoreCase(runMode)) {
+            // En oltp_only → pas d’OLAP
+            if (oltpOnly) {
                 olapThreads = 0;
             }
+
+            // En olap_only → pas d’OLTP
+            if (olapOnly) {
+                oltpThreads = 0;
+            }
+
 
             ExecutorService pool = Executors.newFixedThreadPool(oltpThreads + olapThreads);
 
@@ -91,38 +176,45 @@ public class HTAPRunner {
             pool.shutdown();
             pool.awaitTermination(30, TimeUnit.SECONDS);
 
-            int totalStatements = 0;
-            long maxNanos = 0;
-            for (Future<OLTPWorker.Result> f : oltpFutures) {
-                try {
-                    OLTPWorker.Result r = f.get(30, TimeUnit.SECONDS);
-                    totalStatements += r.statements;
-                    maxNanos = Math.max(maxNanos, r.totalNanos);
-                } catch (TimeoutException te) {
-                    System.err.println("Timeout en attendant un OLTPWorker, on continue sans lui.");
-                } catch (InterruptedException ie) {
-                    System.err.println("Main thread interrompu pendant get(), on sort.");
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (ExecutionException ee) {
-                    System.err.println("OLTPWorker a échoué: " + ee.getCause());
+
+            if (!olapOnly) {
+                int totalStatements = 0;
+                long maxNanos = 0;
+                for (Future<OLTPWorker.Result> f : oltpFutures) {
+                    try {
+                        OLTPWorker.Result r = f.get(30, TimeUnit.SECONDS);
+                        totalStatements += r.statements;
+                        maxNanos = Math.max(maxNanos, r.totalNanos);
+                    } catch (TimeoutException te) {
+                        System.err.println("Timeout en attendant un OLTPWorker, on continue sans lui.");
+                    } catch (InterruptedException ie) {
+                        System.err.println("Main thread interrompu pendant get(), on sort.");
+                        Thread.currentThread().interrupt();
+                        break;
+                    } catch (ExecutionException ee) {
+                        System.err.println("OLTPWorker a échoué: " + ee.getCause());
+                    }
                 }
-            }
 
-            if (maxNanos > 0) {
-                double seconds = maxNanos / 1_000_000_000.0;
-                double tps = totalStatements / seconds;
+                if (maxNanos > 0) {
+                    double seconds = maxNanos / 1_000_000_000.0;
+                    double tps = totalStatements / seconds;
 
-                System.out.printf("[OLTP via proxy][mode=%s] totalStatements=%d, time=%.2fs, TPS=%.2f%n",
-                        runMode, totalStatements, seconds, tps);
-            } else {
-                System.out.println("[OLTP via proxy][mode=" + runMode + "] TPS non calculable (threads interrompus ou erreurs)");
-            }
+                    System.out.printf("[OLTP via proxy][mode=%s] totalStatements=%d, time=%.2fs, TPS=%.2f%n",
+                            runMode, totalStatements, seconds, tps);
+                } else {
+                    System.out.println("[OLTP via proxy][mode=" + runMode + "] TPS non calculable (threads interrompus ou erreurs)");
+                }
 
-            try {
-                MetricsSummary.runOnFile(metricsFile);
-            } catch (Exception e) {
-                System.err.println("Failed to run MetricsSummary: " + e.getMessage());
+                try {
+                    MetricsSummary.runOnFile(metricsFile);
+                    if ("olap_only".equalsIgnoreCase(runMode)) {
+                        OLAPSummary.runOnFile(metricsFile);
+                    }
+
+                } catch (Exception e) {
+                    System.err.println("Failed to run MetricsSummary: " + e.getMessage());
+                }
             }
         }
     }
@@ -188,6 +280,32 @@ public class HTAPRunner {
             Thread.sleep(500);
         }
     }
+
+    private static void waitUntilOlapHasData(ProxyClientInterface proxyClient) throws Exception {
+        long start = System.currentTimeMillis();
+        long timeoutMs = 600_000; // 10 minutes max
+
+        while (true) {
+            try {
+                int cnt = proxyClient.executeScalarInt(
+                        "SELECT count(*) FROM orders WHERE _deleted=0"
+                );
+
+                if (cnt > 1000) {   // seuil minimal
+                    long elapsed = System.currentTimeMillis() - start;
+                    System.out.printf("CDC ready: %d orders visible after %d ms%n", cnt, elapsed);
+                    return;
+                }
+            } catch (Exception ignored) {}
+
+            if (System.currentTimeMillis() - start > timeoutMs) {
+                throw new RuntimeException("CDC n'a pas répliqué orders à temps");
+            }
+
+            Thread.sleep(1000);
+        }
+    }
+
 
     private static void startFreshnessMonitor(ProxyClientInterface proxyClient, MetricsRecorder recorder) {
         Thread t = new Thread(() -> {
