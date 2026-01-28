@@ -68,23 +68,19 @@ public class HTAPConnection implements Connection {
     @Override
     public void commit() throws SQLException {
         checkOpen();
-
         if (!autoCommit) {
             HttpClient.post(endpoint, "/proxy/query", "COMMIT");
-            // redémarre une transaction implicite
-            HttpClient.post(endpoint, "/proxy/query", "BEGIN");
         }
     }
 
     @Override
     public void rollback() throws SQLException {
         checkOpen();
-
         if (!autoCommit) {
             HttpClient.post(endpoint, "/proxy/query", "ROLLBACK");
-            HttpClient.post(endpoint, "/proxy/query", "BEGIN");
         }
     }
+
 
     @Override
     public void close() {
@@ -107,15 +103,22 @@ public class HTAPConnection implements Connection {
         return new HTAPDatabaseMetaData(this);
     }
 
+    private boolean readOnly = false;
+
     @Override
     public void setReadOnly(boolean readOnly) throws SQLException {
-
+        this.readOnly = readOnly;
+        HttpClient.post(endpoint, "/proxy/query",
+                readOnly ? "SET TRANSACTION READ ONLY"
+                        : "SET TRANSACTION READ WRITE");
     }
+
 
     @Override
-    public boolean isReadOnly() throws SQLException {
-        return false;
+    public boolean isReadOnly() {
+        return readOnly;
     }
+
 
     @Override
     public void setCatalog(String catalog) throws SQLException {
@@ -129,13 +132,18 @@ public class HTAPConnection implements Connection {
 
     @Override
     public void setTransactionIsolation(int level) throws SQLException {
-
+        if (level != Connection.TRANSACTION_READ_COMMITTED) {
+            throw new SQLFeatureNotSupportedException(
+                    "Only READ_COMMITTED supported");
+        }
     }
+
 
     @Override
-    public int getTransactionIsolation() throws SQLException {
-        return 0;
+    public int getTransactionIsolation() {
+        return Connection.TRANSACTION_READ_COMMITTED;
     }
+
 
     @Override
     public SQLWarning getWarnings() throws SQLException {
@@ -179,23 +187,25 @@ public class HTAPConnection implements Connection {
     }
 
     @Override
-    public int getHoldability() throws SQLException {
-        return 0;
+    public int getHoldability() {
+        return ResultSet.CLOSE_CURSORS_AT_COMMIT;
     }
+
 
     @Override
     public Savepoint setSavepoint() throws SQLException {
-        return null;
-    }
-
-    @Override
-    public Savepoint setSavepoint(String name) throws SQLException {
-        return null;
+        throw new SQLFeatureNotSupportedException("Savepoints not supported");
     }
 
     @Override
     public void rollback(Savepoint savepoint) throws SQLException {
+        throw new SQLFeatureNotSupportedException("Savepoints not supported");
+    }
 
+
+    @Override
+    public Savepoint setSavepoint(String name) throws SQLException {
+        return null;
     }
 
     @Override
@@ -208,10 +218,10 @@ public class HTAPConnection implements Connection {
         return createStatement();
     }
 
-
     @Override
-    public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        return null;
+    public PreparedStatement prepareStatement(
+            String sql, int rsType, int rsConcurrency, int holdability) {
+        return prepareStatement(sql);
     }
 
     @Override
@@ -225,13 +235,13 @@ public class HTAPConnection implements Connection {
     }
 
     @Override
-    public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
-        return null;
+    public PreparedStatement prepareStatement(String sql, int[] columnIndexes) {
+        return prepareStatement(sql);
     }
 
     @Override
-    public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-        return null;
+    public PreparedStatement prepareStatement(String sql, String[] columnNames) {
+        return prepareStatement(sql);
     }
 
     @Override
@@ -307,14 +317,15 @@ public class HTAPConnection implements Connection {
     }
 
     @Override
-    public void abort(Executor executor) throws SQLException {
-
+    public void abort(Executor executor) {
+        close();
     }
 
     @Override
-    public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {
-
+    public void setNetworkTimeout(Executor executor, int milliseconds) {
+        // no-op
     }
+
 
     @Override
     public int getNetworkTimeout() throws SQLException {
@@ -323,13 +334,17 @@ public class HTAPConnection implements Connection {
 
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
-        return null;
+        if (iface.isInstance(this)) {
+            return iface.cast(this);
+        }
+        throw new SQLException("Not a wrapper for " + iface);
     }
 
     @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        return false;
+    public boolean isWrapperFor(Class<?> iface) {
+        return iface.isInstance(this);
     }
+
 
     /* Le reste : no-op ou UnsupportedOperationException */
 }

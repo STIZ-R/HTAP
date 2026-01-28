@@ -52,14 +52,15 @@ public class HTAPDatabaseMetaData implements DatabaseMetaData {
     }
 
     @Override
-    public boolean supportsResultSetHoldability(int holdability) throws SQLException {
-        return false;
+    public int getResultSetHoldability() throws SQLException {
+        return ResultSet.CLOSE_CURSORS_AT_COMMIT;
     }
 
     @Override
-    public int getResultSetHoldability() throws SQLException {
-        return 0;
+    public boolean supportsResultSetHoldability(int holdability) throws SQLException {
+        return holdability == ResultSet.CLOSE_CURSORS_AT_COMMIT;
     }
+
 
     @Override
     public int getDatabaseMajorVersion() throws SQLException {
@@ -148,8 +149,9 @@ public class HTAPDatabaseMetaData implements DatabaseMetaData {
 
     @Override
     public boolean supportsTransactionIsolationLevel(int level) throws SQLException {
-        return false;
+        return level == Connection.TRANSACTION_READ_COMMITTED;
     }
+
 
     @Override
     public boolean supportsDataDefinitionAndDataManipulationTransactions() throws SQLException {

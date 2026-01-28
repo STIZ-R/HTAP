@@ -9,6 +9,7 @@ public class HTAPStatement implements Statement {
     protected final List<String> batch = new ArrayList<>();
     protected HTAPResultSet resultSet;
     protected int updateCount = 0;
+    private boolean closed = false;
 
 
     HTAPStatement(HTAPConnection conn) {
@@ -40,14 +41,14 @@ public class HTAPStatement implements Statement {
 
     @Override
     public int executeUpdate(String sql) {
-        HttpClient.post(conn.endpoint, "/proxy/query", sql);
-        updateCount = 1;
+        Object res = HttpClient.post(conn.endpoint, "/proxy/query", sql);
+        updateCount = (res instanceof Number) ? ((Number) res).intValue() : 0;
         return updateCount;
-
     }
 
     @Override
     public void close() {
+        closed = true;
         resultSet = null;
         batch.clear();
     }
@@ -112,9 +113,10 @@ public class HTAPStatement implements Statement {
     public boolean execute(String sql) throws SQLException {
         Object res = HttpClient.post(conn.endpoint, "/proxy/query", sql);
         List<Map<String,Object>> rows = adaptResult(res);
-        if (rows != null && !rows.isEmpty()) {
-            this.resultSet = new HTAPResultSet(rows, this);
-            return true;  // a resultset
+        if (rows != null) {
+            resultSet = new HTAPResultSet(rows, this);
+            updateCount = -1;
+            return true;
         }
         this.updateCount = (res instanceof Number) ? ((Number)res).intValue() : 0;
         return false;  // update count
@@ -237,7 +239,7 @@ public class HTAPStatement implements Statement {
 
     @Override
     public boolean isClosed() throws SQLException {
-        return conn.isClosed();
+        return closed;
     }
 
     @Override
@@ -262,12 +264,13 @@ public class HTAPStatement implements Statement {
 
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
-        return null;
+        if (iface.isInstance(this)) return iface.cast(this);
+        throw new SQLException("Not a wrapper");
     }
 
     @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        return false;
+    public boolean isWrapperFor(Class<?> iface) {
+        return iface.isInstance(this);
     }
 
     /* addBatch / executeBatch → important pour perf */

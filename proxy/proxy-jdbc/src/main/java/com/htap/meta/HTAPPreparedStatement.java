@@ -8,6 +8,7 @@ import java.sql.*;
 import java.sql.Date;
 import java.util.*;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class HTAPPreparedStatement extends HTAPStatement implements PreparedStatement {
 
@@ -45,19 +46,20 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
     }
 
     @Override
-    public void setDate(int parameterIndex, Date x) throws SQLException {
-
-    }
-
-    @Override
     public void setTime(int parameterIndex, Time x) throws SQLException {
 
     }
 
     @Override
-    public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
-
+    public void setDate(int i, Date d) {
+        params.put(i, "'" + d.toString() + "'");
     }
+
+    @Override
+    public void setTimestamp(int i, Timestamp ts) {
+        params.put(i, "'" + ts.toString() + "'");
+    }
+
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException {
@@ -300,37 +302,40 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
     }
 
 
-    @Override
-    public void setBoolean(int parameterIndex, boolean x) throws SQLException {
+    @Override public void setBoolean(int i, boolean v) { params.put(i, v); }
+    @Override public void setByte(int i, byte v) { params.put(i, v); }
+    @Override public void setShort(int i, short v) { params.put(i, v); }
 
-    }
 
-    @Override
-    public void setByte(int parameterIndex, byte x) throws SQLException {
-
-    }
-
-    @Override
-    public void setShort(int parameterIndex, short x) throws SQLException {
-
-    }
-
-    private String bind() {
-        String sql = template;
-        for (int i = 1; i <= params.size(); i++) {
-            Object v = params.get(i);
-            sql = sql.replaceFirst("\\?", v == null ? "null" : Matcher.quoteReplacement(v.toString()));
+    private String bind() throws SQLException {
+        StringBuilder sql = new StringBuilder();
+        int lastIndex = 0;
+        int paramIndex = 1;
+        Matcher m = Pattern.compile("\\?").matcher(template);
+        while (m.find()) {
+            sql.append(template, lastIndex, m.start());
+            if (!params.containsKey(paramIndex))
+                throw new SQLException("Missing parameter " + paramIndex);
+            Object v = params.get(paramIndex++);
+            sql.append(v == null ? "null" : v.toString());
+            lastIndex = m.end();
         }
-        return sql;
+        sql.append(template.substring(lastIndex));
+        return sql.toString();
     }
 
 
+
+
+    private boolean closed = false;
 
     @Override
     public void close() {
-
+        closed = true;
+        params.clear();
+        batch.clear();
+        resultSet = null;
     }
-
     @Override
     public int getMaxFieldSize() throws SQLException {
         return 0;
@@ -424,17 +429,20 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
     }
 
     @Override
-    public int getResultSetConcurrency() throws SQLException {
-        return 0;
+    public int getResultSetConcurrency() {
+        return ResultSet.CONCUR_READ_ONLY;
     }
 
     @Override
-    public int getResultSetType() throws SQLException {
-        return 0;
+    public int getResultSetType() {
+        return ResultSet.TYPE_FORWARD_ONLY;
     }
 
+
+
+
     @Override
-    public void addBatch() {
+    public void addBatch() throws SQLException {
         batch.add(bind());
         params.clear();
     }
@@ -501,7 +509,7 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
 
     @Override
     public boolean isClosed() throws SQLException {
-        return false;
+        return closed;
     }
 
     @Override
@@ -530,7 +538,7 @@ public class HTAPPreparedStatement extends HTAPStatement implements PreparedStat
     }
 
     @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
+    public boolean isWrapperFor(Class<?> iface) {
         return false;
     }
 }

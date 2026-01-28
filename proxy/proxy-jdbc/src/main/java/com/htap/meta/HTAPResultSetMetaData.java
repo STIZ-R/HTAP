@@ -13,6 +13,12 @@ public class HTAPResultSetMetaData implements ResultSetMetaData {
         this.columns = columns;
     }
 
+    private void check(int column) throws SQLException {
+        if (column < 1 || column > columns.size())
+            throw new SQLException("Invalid column index " + column);
+    }
+
+
     @Override
     public int getColumnCount() {
         return columns.size();
@@ -32,23 +38,26 @@ public class HTAPResultSetMetaData implements ResultSetMetaData {
     }
 
     @Override
-    public int getColumnType(int column) {
-        // Type générique → suffisant pour JDBC
+    public int getColumnType(int column) throws SQLException {
+        check(column);
         return Types.JAVA_OBJECT;
     }
 
     @Override
-    public String getColumnTypeName(int column) {
+    public String getColumnTypeName(int column) throws SQLException {
+        check(column);
         return "JAVA_OBJECT";
     }
 
     @Override
-    public String getTableName(int column) {
+    public String getTableName(int column) throws SQLException {
+        check(column);
         return "";
     }
 
     @Override
-    public String getSchemaName(int column) {
+    public String getSchemaName(int column) throws SQLException {
+        check(column);
         return "";
     }
 
@@ -58,22 +67,26 @@ public class HTAPResultSetMetaData implements ResultSetMetaData {
     }
 
     @Override
-    public int getPrecision(int column) {
+    public int getPrecision(int column) throws SQLException {
+        check(column);
         return 0;
     }
 
     @Override
-    public int getScale(int column) {
+    public int getScale(int column) throws SQLException {
+        check(column);
         return 0;
     }
 
     @Override
-    public int isNullable(int column) {
+    public int isNullable(int column) throws SQLException {
+        check(column);
         return columnNullable;
     }
 
     @Override
-    public boolean isAutoIncrement(int column) {
+    public boolean isAutoIncrement(int column) throws SQLException {
+        check(column);
         return false;
     }
 
@@ -98,7 +111,8 @@ public class HTAPResultSetMetaData implements ResultSetMetaData {
     }
 
     @Override
-    public int getColumnDisplaySize(int column) {
+    public int getColumnDisplaySize(int column) throws SQLException {
+        check(column);
         return 32;
     }
 

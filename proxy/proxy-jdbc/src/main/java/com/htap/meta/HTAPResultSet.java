@@ -814,7 +814,7 @@ public class HTAPResultSet implements ResultSet {
 
     @Override
     public BigDecimal getBigDecimal(int columnIndex) throws SQLException {
-        return null;
+        return getBigDecimal(getColumnName(columnIndex));
     }
 
     @Override
@@ -1056,10 +1056,16 @@ public class HTAPResultSet implements ResultSet {
     }
 
 
+
+
     @Override
     public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
-        return null;
+        Object val = getObject(columnLabel);
+        if (val == null) return null;
+        if (type.isInstance(val)) return type.cast(val);
+        throw new SQLException("Cannot convert " + val.getClass() + " to " + type);
     }
+
 
     @Override public <T> T unwrap(Class<T> iface) throws SQLException { return null; }
     @Override public boolean isWrapperFor(Class<?> iface) throws SQLException { return false; }
