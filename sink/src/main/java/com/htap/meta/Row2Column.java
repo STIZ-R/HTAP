@@ -71,31 +71,35 @@ public class Row2Column {
                     } else {
                         row.put(f, v);
                     }
-                } else if (val.isBinary()) {
-                    try {
-                        byte[] bytes = val.binaryValue();
-                        BigInteger bi = new BigInteger(bytes);
-                        Integer scale = decimalScales.get(f);
-                        if (scale != null) {
-                            row.put(f, new BigDecimal(bi, scale));
-                        } else {
-                            row.put(f, new String(bytes));
-                        }
-                    } catch (Exception e) {
-                        row.put(f, null);
-                    }
-                } else if (val.isTextual()) {
+                } else if (val.isTextual() || val.isBinary()) {
+                    // Base64 -> Decimal
                     Integer scale = decimalScales.get(f);
                     if (scale != null) {
                         try {
-                            byte[] bytes = Base64.getDecoder().decode(val.asText());
+                            byte[] bytes = val.isTextual() ? Base64.getDecoder().decode(val.asText()) : val.binaryValue();
                             BigInteger bi = new BigInteger(bytes);
                             row.put(f, new BigDecimal(bi, scale));
                         } catch (Exception e) {
-                            row.put(f, val.asText());
+                            row.put(f, val.isTextual() ? val.asText() : null);
                         }
                     } else {
-                        row.put(f, val.asText());
+                        row.put(f, val.isTextual() ? val.asText() : new String(val.binaryValue()));
+                    }
+                } else if (val.isObject()) {
+                    // Cas Debezium Decimal : { "scale": X, "value": Base64String }
+                    JsonNode valueNode = val.get("value");
+                    JsonNode scaleNode = val.get("scale");
+                    if (valueNode != null && scaleNode != null) {
+                        try {
+                            byte[] bytes = Base64.getDecoder().decode(valueNode.asText());
+                            BigInteger bi = new BigInteger(bytes);
+                            int scale = scaleNode.asInt();
+                            row.put(f, new BigDecimal(bi, scale));
+                        } catch (Exception e) {
+                            row.put(f, null);
+                        }
+                    } else {
+                        row.put(f, val.toString());
                     }
                 } else {
                     row.put(f, val.toString());
@@ -118,7 +122,6 @@ public class Row2Column {
         if (fields == null || !fields.isArray()) return map;
 
         for (JsonNode field : fields) {
-            // on cherche le champ "after" (ou "before") qui contient la structure des colonnes
             JsonNode fieldNameNode = field.get("field");
             if (fieldNameNode == null) continue;
             String fieldName = fieldNameNode.asText();

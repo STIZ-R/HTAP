@@ -18,6 +18,8 @@ public class HTAPDriver implements Driver {
         if (!acceptsURL(url)) return null;
 
         String endpoint = url.substring("jdbc:htap:".length());
+        System.out.println("[PROXY] New JDBC connection created");
+
 
         return new HTAPConnection(endpoint);
     }

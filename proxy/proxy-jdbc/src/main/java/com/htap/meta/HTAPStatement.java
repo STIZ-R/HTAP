@@ -36,6 +36,7 @@ public class HTAPStatement implements Statement {
         Object res = HttpClient.post(conn.endpoint, "/proxy/query", sql);
         List<Map<String,Object>> rows = adaptResult(res);
         this.resultSet = new HTAPResultSet(rows, this);
+        System.out.println("[PROXY SQL] " + sql);
         return this.resultSet;
     }
 

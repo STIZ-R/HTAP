@@ -89,3 +89,65 @@ curl "http://localhost:8080/proxy/query?sql=INSERT+INTO+users+(name,+email)     
                                                     'User ' || i,                          -- génère un nom du type "User 1", "User 2", ...
                                                     'user' || i || '@example.com'          -- génère un email unique "user1@example.com", etc.
                                                 FROM generate_series(1, 500000) AS i;
+
+
+docker exec -it htap-postgres bash
+psql -U htap -d htapdb
+
+SELECT rolpassword FROM pg_authid WHERE rolname='htap';
+> md5
+
+
+docker exec -it htap-benchmark bash
+cd HTAPBench-master
+
+java -cp "../htapbench.jar" pt.haslab.htapbench.core.HTAPBench \
+-b postgres \
+-c config/htapb_config_postgres.xml \
+--create false \
+--load true \
+--execute false \
+--calibrate false
+
+ALTER SYSTEM SET password_encryption = 'md5';
+SELECT pg_reload_conf();
+
+ALTER ROLE htap WITH PASSWORD 'htap';
+
+
+SELECT rolname, rolpassword
+FROM pg_authid
+WHERE rolname = 'htap';
+
+docker restart htap-postgres
+
+docker exec -it htap-benchmark bash
+
+cd HTAPBench-master
+
+
+LOAD
+java -cp "../htapbench.jar" pt.haslab.htapbench.core.HTAPBench \
+-b postgres \
+-c config/htapb_config_postgres.xml \
+--create false \
+--load true \
+--execute false \
+--calibrate false
+
+EXECUTE
+
+java -cp "../htapbench.jar:../proxy-jdbc:../proxy-core:../utils" \
+pt.haslab.htapbench.core.HTAPBench \
+-b proxy \
+-c config/htapb_config_proxy.xml \
+--create false \
+--load false \
+--execute true \
+--calibrate false
+
+java -cp "target/htapbench-0.95-jar-with-dependencies.jar" \
+    pt.haslab.htapbench.core.HTAPBench \
+    -b proxy \
+    -c config/htapb_config_proxy.xml \
+    --create=false --load=false --execute=true --calibrate=false

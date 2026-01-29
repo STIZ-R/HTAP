@@ -14,7 +14,6 @@
         <module name="utils" />
         <module name="executors" />
         <module name="benchmarks" />
-        <module name="pgwire" />
         <module name="benchmark" />
         <module name="hotcold-manager" />
         <module name="proxy-pgwire" />
@@ -23,6 +22,7 @@
     <bytecodeTargetLevel>
       <module name="api" target="25" />
       <module name="benchmark" target="17" />
+      <module name="pgwire" target="17" />
     </bytecodeTargetLevel>
   </component>
 </project>

@@ -63,6 +63,11 @@ public class QueryRouter {
         }
 
         QueryRouteDecision decision = analyzer.analyze(sql);
+        System.out.println(
+                "\n[HTAP-PROXY]"
+                        + "\nSQL      : " + sql
+                        + "\nDECISION : " + decision
+        );
 
         switch (decision) {
 

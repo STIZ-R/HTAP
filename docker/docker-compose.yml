@@ -9,6 +9,7 @@ services:
       POSTGRES_USER: htap
       POSTGRES_PASSWORD: htap
       POSTGRES_DB: htapdb
+      POSTGRES_HOST_AUTH_METHOD: md5
     ports:
       - "5433:5432"
     volumes:
@@ -16,6 +17,8 @@ services:
       - ./postgres/init:/docker-entrypoint-initdb.d
     networks:
       - htap-net
+
+
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.3
@@ -131,7 +134,18 @@ services:
       - htap-net
 
 
-# Si on veut le benchmark fait-maison
+  benchmark:
+    build:
+      context: ..
+      dockerfile: benchmark_official/Dockerfile
+    container_name: htap-benchmark
+    depends_on:
+      - proxy
+    networks:
+      - htap-net
+
+
+    # Si on veut le benchmark fait-maison
 #  benchmark:
 #    build:
 #      context: ../

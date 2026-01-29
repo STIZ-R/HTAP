@@ -54,13 +54,27 @@ public class KafkaConsumerApp {
             return;
         }
 
-        List<String> htapTopics = Arrays.asList(
-                "htap.public.warehouse",
-                "htap.public.district",
+//        List<String> htapTopics = Arrays.asList(
+//                "htap.public.warehouse",
+//                "htap.public.district",
+//                "htap.public.customer",
+//                "htap.public.start",
+//                "htap.public.orders",
+//                "htap.public.order_line"
+//        );
+List<String> htapTopics = Arrays.asList(
                 "htap.public.customer",
-                "htap.public.start",
-                "htap.public.orders",
-                "htap.public.order_line"
+                "htap.public.district",
+                "htap.public.history",
+                "htap.public.item",
+                "htap.public.nation",
+                "htap.public.new_order",
+        "htap.public.oorder",
+        "htap.public.order_line",
+        "htap.public.region",
+        "htap.public.stock",
+        "htap.public.supplier",
+        "htap.public.warehouse"
         );
 
         consumer.subscribe(htapTopics);

@@ -100,6 +100,7 @@ public class HTAPConnection implements Connection {
 
     @Override
     public DatabaseMetaData getMetaData() throws SQLException {
+        checkOpen();
         return new HTAPDatabaseMetaData(this);
     }
 

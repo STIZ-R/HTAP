@@ -13,7 +13,6 @@
         <module>utils</module>
         <module>executors</module>
         <module>proxy-api</module>
-        <module>proxy-pgwire</module>
         <module>proxy-jdbc</module>
     </modules>
 
