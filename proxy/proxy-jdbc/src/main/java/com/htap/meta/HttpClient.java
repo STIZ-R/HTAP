@@ -1,7 +1,6 @@
 package com.htap.meta;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +14,35 @@ public class HttpClient {
                     .version(java.net.http.HttpClient.Version.HTTP_1_1)
                     .build();
 
+    /**
+     * Transforme endpoint="htap-proxy:8080/htapdb" → "http://htap-proxy:8080"
+     * + path → "http://htap-proxy:8080/proxy/query"
+     */
+    private static URI buildUri(String endpoint, String path) {
+        String base = endpoint;
+
+        // Enlève jdbc:htap:// et garde "htap-proxy:8080/htapdb"
+        if (base.startsWith("jdbc:htap://")) {
+            base = base.substring(11);
+        }
+
+        // Enlève /htapdb pour ne garder que host:port
+        int slash = base.indexOf('/');
+        if (slash > 0) {
+            base = base.substring(0, slash);
+        }
+
+        // Ajoute http://
+        if (!base.startsWith("http://") && !base.startsWith("https://")) {
+            base = "http://" + base;
+        }
+
+        // Path avec / au début
+        String p = path.startsWith("/") ? path : "/" + path;
+
+        return URI.create(base + p);
+    }
+
     @SuppressWarnings("unchecked")
     public static Object post(String base, String path, String sql) {
         try {
@@ -22,7 +50,7 @@ public class HttpClient {
             String body = MAPPER.writeValueAsString(payload);
 
             HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(base + path))
+                    .uri(buildUri(base, path))  // ✅ CORRIGÉ ICI
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                     .build();
@@ -51,7 +79,7 @@ public class HttpClient {
             String body = MAPPER.writeValueAsString(payload);
 
             HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(base + "/proxy/query/batch"))
+                    .uri(buildUri(base, "/proxy/query/batch"))  // ✅ CORRIGÉ ICI AUSSI
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();

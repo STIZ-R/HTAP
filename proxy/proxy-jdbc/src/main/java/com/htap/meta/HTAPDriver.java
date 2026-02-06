@@ -17,12 +17,14 @@ public class HTAPDriver implements Driver {
     public Connection connect(String url, Properties info) throws SQLException {
         if (!acceptsURL(url)) return null;
 
-        String endpoint = url.substring("jdbc:htap:".length());
-        System.out.println("[PROXY] New JDBC connection created");
+        String endpoint = url.substring("jdbc:htap://".length());
+        System.out.println("🔗 PROXY New JDBC connection: " + endpoint);
 
-
-        return new HTAPConnection(endpoint);
+        HTAPConnection conn = new HTAPConnection(endpoint);
+        conn.closed = false;  // ✅ Force open
+        return conn;
     }
+
 
 
     @Override

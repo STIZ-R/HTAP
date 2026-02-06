@@ -29,11 +29,20 @@
               <goal>shade</goal>
             </goals>
             <configuration>
-              <transformers>
-                <transformer>
-                  <mainClass>com.htap.jdbc.MainTest</mainClass>
-                </transformer>
-              </transformers>
+              <relocations>
+                <relocation>
+                  <pattern>com.fasterxml.jackson.core</pattern>
+                  <shadedPattern>com.htap.shade.jackson.core</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>com.fasterxml.jackson.databind</pattern>
+                  <shadedPattern>com.htap.shade.jackson.databind</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>com.fasterxml.jackson.annotation</pattern>
+                  <shadedPattern>com.htap.shade.jackson.annotation</shadedPattern>
+                </relocation>
+              </relocations>
             </configuration>
           </execution>
         </executions>

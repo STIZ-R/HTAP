@@ -2,8 +2,10 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- Parent -->
     <parent>
         <groupId>com.htap.meta</groupId>
         <artifactId>proxy</artifactId>
@@ -11,54 +13,66 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <groupId>com.htap.meta</groupId>
     <artifactId>proxy-jdbc</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>HTAP Proxy JDBC Driver</name>
+
+    <!-- ================= DEPENDENCIES ================= -->
 
     <dependencies>
-        <!-- Utilitaires internes (ton code commun) -->
+
+        <!-- Utils internes -->
         <dependency>
             <groupId>com.htap.meta</groupId>
             <artifactId>utils</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- PostgreSQL JDBC (optionnel si tu veux tester localement) -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>42.6.0</version>
-        </dependency>
-
-        <!-- JSON processing -->
+        <!-- Jackson (UNE seule version, embarquée) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>2.15.2</version>
+            <scope>provided</scope>
         </dependency>
 
-        <!-- HTTP Client (Java 11+ utilise java.net.http par défaut, mais ici on peut garder Apache HttpClient si besoin) -->
+        <!-- HTTP client Java 11+ -->
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
             <artifactId>httpclient5</artifactId>
             <version>5.2.1</version>
         </dependency>
 
-        <!-- Optionnel : Logging -->
+        <!-- PostgreSQL JDBC (facultatif mais OK) -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.6.0</version>
+        </dependency>
+
+        <!-- Logging simple -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>2.0.7</version>
         </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
             <version>2.0.7</version>
         </dependency>
+
     </dependencies>
 
+    <!-- ================= BUILD ================= -->
+
     <build>
+
         <plugins>
+
             <!-- Compiler -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -70,26 +84,27 @@
                 </configuration>
             </plugin>
 
-            <!-- Shade / uber-jar si nécessaire -->
-            <plugin>
+            <!-- SHADE : FAT JAR AUTONOME (SANS relocation) -->
+       <!--     <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.5.0</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
-                        <goals><goal>shade</goal></goals>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
                         <configuration>
-                            <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.htap.jdbc.MainTest</mainClass>
-                                </transformer>
-                            </transformers>
+
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
+            </plugin> -->
 
         </plugins>
+
     </build>
+
 </project>

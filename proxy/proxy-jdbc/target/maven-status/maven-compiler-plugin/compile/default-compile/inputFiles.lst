@@ -2,6 +2,9 @@
 /home/etudiant/Bureau/HTAP/proxy/proxy-jdbc/src/main/java/com/htap/meta/Main.java
 /home/etudiant/Bureau/HTAP/proxy/proxy-jdbc/src/main/java/com/htap/meta/HTAPConnection.java
 /home/etudiant/Bureau/HTAP/proxy/proxy-jdbc/src/main/java/com/htap/meta/HttpClient.java
+/home/etudiant/Bureau/HTAP/proxy/proxy-jdbc/src/main/java/com/htap/meta/HTAPResultSetMetaData.java
+/home/etudiant/Bureau/HTAP/proxy/proxy-jdbc/src/main/java/com/htap/meta/HTAPDatabaseMetaData.java
 /home/etudiant/Bureau/HTAP/proxy/proxy-jdbc/src/main/java/com/htap/meta/HTAPStatement.java
+/home/etudiant/Bureau/HTAP/proxy/proxy-jdbc/src/main/java/com/htap/meta/HTAPParameterMetaData.java
 /home/etudiant/Bureau/HTAP/proxy/proxy-jdbc/src/main/java/com/htap/meta/HTAPDriver.java
 /home/etudiant/Bureau/HTAP/proxy/proxy-jdbc/src/main/java/com/htap/meta/HTAPPreparedStatement.java
