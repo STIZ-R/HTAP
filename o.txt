@@ -173,3 +173,11 @@ java -cp "../lib/proxy-jdbc:../lib/proxy-core:../lib/utils:target/htapbench-0.95
   pt.haslab.htapbench.core.HTAPBench -b proxy -c config/htapb_config_proxy.xml \
   --create=false --load=false --execute=true --calibrate=false
 
+etudiant@debian:~/Bureau/HTAP/docker$ mkdir -p /tmp/jackson
+etudiant@debian:~/Bureau/HTAP/docker$ cp ~/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/*/jackson-annotations-*.jar /tmp/jackson/
+etudiant@debian:~/Bureau/HTAP/docker$ docker exec htap-benchmark mkdir -p /bench/lib/jackson
+etudiant@debian:~/Bureau/HTAP/docker$ docker cp /tmp/jackson/. htap-benchmark:/bench/lib/jackson/
+Successfully copied 11.4MB to htap-benchmark:/bench/lib/jackson/
+etudiant@debian:~/Bureau/HTAP/docker$ docker exec -it htap-benchmark bash -lc "cd /bench/HTAPBench-master && java -cp '../lib/proxy-jdbc:../lib/proxy-core:../lib/utils:../lib/jackson/*:target/htapbench-0.95-jar-with-dependencies.jar' pt.haslab.htapbench.core.HTAPBench -b proxy -c config/htapb_config_proxy.xml --create=false --load=false --execute=true -s 60 --calibrate=false"
+|--------------------------------------------|
+| NON standard # OLTP workers 5|

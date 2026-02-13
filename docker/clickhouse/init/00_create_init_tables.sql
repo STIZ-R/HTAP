@@ -90,7 +90,7 @@
 -- -----------------------------
 -- Table region
 -- -----------------------------
-CREATE TABLE region (
+CREATE TABLE REGION (
                         r_regionkey Int32,
                         r_name String,
                         r_comment String,
@@ -104,7 +104,7 @@ ORDER BY r_regionkey;
 -- -----------------------------
 -- Table nation
 -- -----------------------------
-CREATE TABLE nation (
+CREATE TABLE NATION (
                         n_nationkey Int32,
                         n_name String,
                         n_regionkey Int32,
@@ -119,7 +119,7 @@ ORDER BY n_nationkey;
 -- -----------------------------
 -- Table supplier
 -- -----------------------------
-CREATE TABLE supplier (
+CREATE TABLE SUPPLIER (
                           su_suppkey Int32,
                           su_name String,
                           su_address String,
@@ -137,7 +137,7 @@ ORDER BY su_suppkey;
 -- -----------------------------
 -- Table warehouse
 -- -----------------------------
-CREATE TABLE warehouse (
+CREATE TABLE WAREHOUSE (
                            w_id Int32,
                            w_ytd Float64,
                            w_tax Float64,
@@ -157,7 +157,7 @@ ORDER BY w_id;
 -- -----------------------------
 -- Table item
 -- -----------------------------
-CREATE TABLE item (
+CREATE TABLE ITEM (
                       i_id Int32,
                       i_name String,
                       i_price Float64,
@@ -173,7 +173,7 @@ ORDER BY i_id;
 -- -----------------------------
 -- Table customer (PK composite)
 -- -----------------------------
-CREATE TABLE customer (
+CREATE TABLE CUSTOMER (
                           c_w_id Int32,
                           c_d_id Int32,
                           c_id Int32,
@@ -205,7 +205,7 @@ ORDER BY (c_w_id, c_d_id, c_id);
 -- -----------------------------
 -- Table district (PK composite)
 -- -----------------------------
-CREATE TABLE district (
+CREATE TABLE DISTRICT (
                           d_w_id Int32,
                           d_id Int32,
                           d_ytd Float64,
@@ -227,7 +227,7 @@ ORDER BY (d_w_id, d_id);
 -- -----------------------------
 -- Table stock (PK composite)
 -- -----------------------------
-CREATE TABLE stock (
+CREATE TABLE STOCK (
                        s_w_id Int32,
                        s_i_id Int32,
                        s_quantity Float64,
@@ -255,7 +255,7 @@ ORDER BY (s_w_id, s_i_id);
 -- -----------------------------
 -- Table oorder (PK composite)
 -- -----------------------------
-CREATE TABLE oorder (
+CREATE TABLE OORDER (
                         o_w_id Int32,
                         o_d_id Int32,
                         o_id Int32,
@@ -274,7 +274,7 @@ ORDER BY (o_w_id, o_d_id, o_id);
 -- -----------------------------
 -- Table new_order (PK composite)
 -- -----------------------------
-CREATE TABLE new_order (
+CREATE TABLE NEW_ORDER (
                            no_w_id Int32,
                            no_d_id Int32,
                            no_o_id Int32,
@@ -288,7 +288,7 @@ ORDER BY (no_w_id, no_d_id, no_o_id);
 -- -----------------------------
 -- Table order_line (PK composite)
 -- -----------------------------
-CREATE TABLE order_line (
+CREATE TABLE ORDER_LINE (
                             ol_w_id Int32,
                             ol_d_id Int32,
                             ol_o_id Int32,
@@ -309,7 +309,7 @@ ORDER BY (ol_w_id, ol_d_id, ol_o_id, ol_number);
 -- -----------------------------
 -- Table history (pas de PK naturel → ordre temporel)
 -- -----------------------------
-CREATE TABLE history (
+CREATE TABLE HISTORY (
                          h_c_id Int32,
                          h_c_d_id Int32,
                          h_c_w_id Int32,

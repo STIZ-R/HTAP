@@ -57,45 +57,33 @@ public class QueryRouter {
      *   - HYBRID → exécution parallèle partie chaude (OLTP) + partie froide (OLAP),
      *              puis fusion des résultats.
      */
-    public Map<String, Object> route(String sql) throws Exception {  // ✅ Map au lieu d'Object
+    public Object route(String sql) throws Exception {
         String trimmed = sql.trim().toUpperCase();
 
         if (trimmed.startsWith("INSERT") && trimmed.contains("SELECT")) {
-            Object rawResult = executorFactory.getOLTPExecutor().executeRaw(sql);
-            return wrapResult(rawResult, "OLTP_ONLY (INSERT-SELECT)");
+            return executorFactory.getOLTPExecutor().executeRaw(sql); // int
         }
 
         QueryRouteDecision decision = analyzer.analyze(sql);
-        System.out.println(
-                "\n[HTAP-PROXY]\nSQL      : " + sql.substring(0, 80) + "..."
-                        + "\nDECISION : " + decision
-        );
+        System.out.println("\n[HTAP-PROXY]\nSQL      : " + sql + "\nDECISION : " + decision);
 
-        Object rawResult;
         switch (decision) {
             case OLTP_ONLY:
-                rawResult = executorFactory.getOLTPExecutor().execute(sql);
-                break;
+                return executorFactory.getOLTPExecutor().execute(sql); // List<Map> ou int
             case OLAP_ONLY:
-                String olapSql = sql.contains("HTAP_STRICT")
-                        ? addFinalWithJSqlParser(sql)
-                        : sql;
-                rawResult = executorFactory.getOLAPExecutor().execute(olapSql);
-                break;
+                String olapSql = sql.contains("HTAP_STRICT") ? addFinalWithJSqlParser(sql) : sql;
+                return executorFactory.getOLAPExecutor().execute(olapSql); // List<Map>
             case HYBRID:
                 Future<Object> fHot = pool.submit((Callable<Object>) () ->
                         executorFactory.getOLTPExecutor().execute(analyzer.addHotPredicate(sql)));
                 Future<Object> fCold = pool.submit((Callable<Object>) () ->
                         executorFactory.getOLAPExecutor().execute(addFinalWithJSqlParser(analyzer.addColdPredicate(sql))));
-                rawResult = JDBCResultMerger.merge(fHot.get(), fCold.get());
-                break;
+                return JDBCResultMerger.merge(fHot.get(), fCold.get()); // idéalement List<Map>
             default:
                 throw new IllegalStateException("Unexpected decision: " + decision);
         }
-
-        // ✅ WRAP OBLIGATOIRE pour JDBC
-        return wrapResult(rawResult, decision.name());
     }
+
 
     /** Helper : wrap résultat en format JSON compatible JDBC */
     private Map<String, Object> wrapResult(Object rawResult, String decision) {
@@ -140,9 +128,7 @@ public class QueryRouter {
             return sql;
         }
 
-        if (upper.contains(" FINAL ")
-                || upper.endsWith(" FINAL")
-                || upper.contains(" SETTINGS FINAL")) {
+        if (upper.contains(" FINAL ") || upper.endsWith(" FINAL") || upper.contains(" SETTINGS FINAL")) {
             return sql;
         }
 
@@ -169,13 +155,16 @@ public class QueryRouter {
 
                 int idx = sqlUpper.indexOf(marker);
                 if (idx >= 0) {
-                    int insertPos = idx + marker.length();
+                    int insertPos = Math.min(idx + marker.length(), sql.length());
                     return sql.substring(0, insertPos) + " FINAL" + sql.substring(insertPos);
                 }
             }
+
             return sql;
+
         } catch (Exception e) {
             return sql;
         }
     }
+
 }

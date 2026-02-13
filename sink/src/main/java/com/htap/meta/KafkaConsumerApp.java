@@ -128,7 +128,8 @@ List<String> htapTopics = Arrays.asList(
 
     private static String topicToTable(String topic) {
         String[] parts = topic.split("\\.");
-        return parts.length == 3 ? parts[2] : topic;
+        String p = parts.length == 3 ? parts[2] : topic;
+        return p.toUpperCase();
     }
 
     static class BatchFlusher {
