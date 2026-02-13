@@ -42,14 +42,14 @@ public class KafkaConsumerApp {
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
 
-        List<String> htapsTopics = new ArrayList<>();
+        List<String> htapTopics = new ArrayList<>();
         for (String topic : consumer.listTopics().keySet()) {
             if (topic.startsWith("htap.")) {
-                htapsTopics.add(topic);
+                htapTopics.add(topic);
             }
         }
 
-        if (htapsTopics.isEmpty()) {
+        if (htapTopics.isEmpty()) {
             System.err.println("Aucun topic htap trouvé !");
             return;
         }
@@ -62,20 +62,18 @@ public class KafkaConsumerApp {
 //                "htap.public.orders",
 //                "htap.public.order_line"
 //        );
-List<String> htapTopics = Arrays.asList(
+        List<String> htapsTopics = Arrays.asList(
+                // HyBench (Postgres public.*)
+                "htap.public.company",
                 "htap.public.customer",
-                "htap.public.district",
-                "htap.public.history",
-                "htap.public.item",
-                "htap.public.nation",
-                "htap.public.new_order",
-        "htap.public.oorder",
-        "htap.public.order_line",
-        "htap.public.region",
-        "htap.public.stock",
-        "htap.public.supplier",
-        "htap.public.warehouse"
+                "htap.public.savingaccount",
+                "htap.public.checkingaccount",
+                "htap.public.transfer",
+                "htap.public.checking",
+                "htap.public.loanapps",
+                "htap.public.loantrans"
         );
+
 
         consumer.subscribe(htapTopics);
         System.out.println("Kafka consumer démarré pour les topics: " + htapTopics);
@@ -128,8 +126,10 @@ List<String> htapTopics = Arrays.asList(
 
     private static String topicToTable(String topic) {
         String[] parts = topic.split("\\.");
-        return parts.length == 3 ? parts[2] : topic;
+        String t = (parts.length == 3) ? parts[2] : topic;
+        return t.toUpperCase();   // <-- IMPORTANT si tes tables CH sont en majuscules
     }
+
 
     static class BatchFlusher {
         private final String table;

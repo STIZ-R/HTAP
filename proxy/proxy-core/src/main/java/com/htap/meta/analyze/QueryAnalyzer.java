@@ -12,25 +12,69 @@ import com.htap.meta.routing.QueryRouteDecision;
  */
 public class QueryAnalyzer {
 
-    public QueryRouteDecision analyze(String sql) {
-        String upper = sql.trim().toUpperCase();
+//    public QueryRouteDecision analyze(String sql) {
+//        String upper = sql.trim().toUpperCase();
+//
+//        if (upper.startsWith("INSERT")
+//                || upper.startsWith("UPDATE")
+//                || upper.startsWith("DELETE")) {
+//            return QueryRouteDecision.OLTP_ONLY;
+//        }
+//
+//        if (upper.contains("HTAP_HYBRID")) {
+//            return QueryRouteDecision.HYBRID;
+//        }
+//
+//        if (upper.startsWith("SELECT")) {
+//            return QueryRouteDecision.OLAP_ONLY;
+//        }
+//
+//        return QueryRouteDecision.OLTP_ONLY;
+//    }
+public QueryRouteDecision analyze(String sql) {
+    String upper = sql.trim().toUpperCase();
 
-        if (upper.startsWith("INSERT")
-                || upper.startsWith("UPDATE")
-                || upper.startsWith("DELETE")) {
-            return QueryRouteDecision.OLTP_ONLY;
-        }
+    // 1️⃣ Mutations => OLTP
+    if (upper.startsWith("INSERT") || upper.startsWith("UPDATE") || upper.startsWith("DELETE")) {
+        return QueryRouteDecision.OLTP_ONLY;
+    }
 
-        if (upper.contains("HTAP_HYBRID")) {
-            return QueryRouteDecision.HYBRID;
-        }
+    // 2️⃣ Hint manuel pour forcer l'hybride
+    if (upper.contains("HTAP_HYBRID")) {
+        return QueryRouteDecision.HYBRID;
+    }
 
-        if (upper.startsWith("SELECT")) {
+    // 3️⃣ SELECT
+    if (upper.startsWith("SELECT")) {
+
+        // Requêtes analytiques lourdes
+        if (upper.contains("JOIN")
+                || upper.contains("GROUP BY")
+                || upper.contains("COUNT(")
+                || upper.contains("SUM(")
+                || upper.contains("AVG(")
+                || upper.contains("MIN(")
+                || upper.contains("MAX(")) {
             return QueryRouteDecision.OLAP_ONLY;
         }
 
-        return QueryRouteDecision.OLTP_ONLY;
+        // Scan simple => OLAP (ClickHouse est meilleur pour ça)
+        return QueryRouteDecision.OLAP_ONLY;
     }
+
+    // Par défaut : OLTP
+    return QueryRouteDecision.OLTP_ONLY;
+}
+
+
+    private boolean mentionsTpcc(String upper) {
+        return upper.contains(" CUSTOMER") || upper.contains(" WAREHOUSE")
+                || upper.contains(" DISTRICT") || upper.contains(" STOCK")
+                || upper.contains(" ORDER_LINE") || upper.contains(" OORDER")
+                || upper.contains(" NEW_ORDER") || upper.contains(" HISTORY")
+                || upper.contains(" ITEM");
+    }
+
 
     /**
      * Ajoute un prédicat "hot" sans casser le SQL.

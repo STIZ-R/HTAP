@@ -181,3 +181,410 @@ INSERT INTO customer (c_w_id, c_d_id, c_id, c_first, c_last)
 VALUES (1, 1, 1, 'John', 'Doe')
 ON CONFLICT (c_w_id, c_d_id, c_id) DO NOTHING;
 
+-- Script de création automatique des tables TPC-C
+-- Basé sur les métadonnées fournies
+
+-- Table: region (pas de FK)
+CREATE TABLE region (
+                        r_regionkey integer NOT NULL,
+                        r_name character(55) NOT NULL,
+                        r_comment character(152) NOT NULL,
+                        CONSTRAINT region_pkey PRIMARY KEY (r_regionkey)
+);
+
+-- Table: nation (FK vers region)
+CREATE TABLE nation (
+                        n_nationkey integer NOT NULL,
+                        n_name character(25) NOT NULL,
+                        n_regionkey integer NOT NULL,
+                        n_comment character(152) NOT NULL,
+                        CONSTRAINT nation_pkey PRIMARY KEY (n_nationkey),
+                        CONSTRAINT nation_region_fkey FOREIGN KEY (n_regionkey) REFERENCES region(r_regionkey)
+);
+
+-- Table: supplier (FK vers nation)
+CREATE TABLE supplier (
+                          su_suppkey integer NOT NULL,
+                          su_name character(25) NOT NULL,
+                          su_address character varying(40) NOT NULL,
+                          su_nationkey integer NOT NULL,
+                          su_phone character(15) NOT NULL,
+                          su_acctbal numeric(12,2) NOT NULL,
+                          su_comment character(101) NOT NULL,
+                          CONSTRAINT supplier_pkey PRIMARY KEY (su_suppkey),
+                          CONSTRAINT supplier_nation_fkey FOREIGN KEY (su_nationkey) REFERENCES nation(n_nationkey)
+);
+
+-- Table: warehouse (pas de FK)
+CREATE TABLE warehouse (
+                           w_id integer NOT NULL,
+                           w_ytd numeric(12,2) NOT NULL,
+                           w_tax numeric(5,4) NOT NULL,
+                           w_name character varying(10) NOT NULL,
+                           w_street_1 character varying(20) NOT NULL,
+                           w_street_2 character varying(20) NOT NULL,
+                           w_city character varying(20) NOT NULL,
+                           w_state character(2) NOT NULL,
+                           w_zip character(9) NOT NULL,
+                           CONSTRAINT warehouse_pkey PRIMARY KEY (w_id)
+);
+
+-- Table: item (pas de FK)
+CREATE TABLE item (
+                      i_id integer NOT NULL,
+                      i_name character varying(24) NOT NULL,
+                      i_price numeric(5,2) NOT NULL,
+                      i_data character varying(50) NOT NULL,
+                      i_im_id integer NOT NULL,
+                      CONSTRAINT item_pkey PRIMARY KEY (i_id)
+);
+
+-- Table: customer (PK composite)
+CREATE TABLE customer (
+                          c_w_id integer NOT NULL,
+                          c_d_id integer NOT NULL,
+                          c_id integer NOT NULL,
+                          c_discount numeric(5,4) NOT NULL,
+                          c_credit character(2) NOT NULL,
+                          c_last character varying(16) NOT NULL,
+                          c_first character varying(16) NOT NULL,
+                          c_credit_lim numeric(12,2) NOT NULL,
+                          c_balance numeric(12,2) NOT NULL,
+                          c_ytd_payment double precision NOT NULL,
+                          c_payment_cnt integer NOT NULL,
+                          c_delivery_cnt integer NOT NULL,
+                          c_street_1 character varying(20) NOT NULL,
+                          c_street_2 character varying(20) NOT NULL,
+                          c_city character varying(20) NOT NULL,
+                          c_state character(2) NOT NULL,
+                          c_zip character(9) NOT NULL,
+                          c_phone character(16) NOT NULL,
+                          c_since timestamp without time zone NOT NULL,
+                          c_middle character(2) NOT NULL,
+                          c_data character varying(500) NOT NULL,
+                          CONSTRAINT customer_pkey PRIMARY KEY (c_w_id, c_d_id, c_id)
+);
+
+-- Table: district (PK composite, FK vers warehouse)
+CREATE TABLE district (
+                          d_w_id integer NOT NULL,
+                          d_id integer NOT NULL,
+                          d_ytd numeric(12,2) NOT NULL,
+                          d_tax numeric(5,4) NOT NULL,
+                          d_next_o_id integer NOT NULL,
+                          d_name character varying(10) NOT NULL,
+                          d_street_1 character varying(20) NOT NULL,
+                          d_street_2 character varying(20) NOT NULL,
+                          d_city character varying(20) NOT NULL,
+                          d_state character(2) NOT NULL,
+                          d_zip character(9) NOT NULL,
+                          CONSTRAINT district_pkey PRIMARY KEY (d_w_id, d_id),
+                          CONSTRAINT district_warehouse_fkey FOREIGN KEY (d_w_id) REFERENCES warehouse(w_id)
+);
+
+-- Table: stock (PK composite, FK vers item, warehouse)
+CREATE TABLE stock (
+                       s_w_id integer NOT NULL,
+                       s_i_id integer NOT NULL,
+                       s_quantity numeric(4,0) NOT NULL,
+                       s_ytd numeric(8,2) NOT NULL,
+                       s_order_cnt integer NOT NULL,
+                       s_remote_cnt integer NOT NULL,
+                       s_data character varying(50) NOT NULL,
+                       s_dist_01 character(24) NOT NULL,
+                       s_dist_02 character(24) NOT NULL,
+                       s_dist_03 character(24) NOT NULL,
+                       s_dist_04 character(24) NOT NULL,
+                       s_dist_05 character(24) NOT NULL,
+                       s_dist_06 character(24) NOT NULL,
+                       s_dist_07 character(24) NOT NULL,
+                       s_dist_08 character(24) NOT NULL,
+                       s_dist_09 character(24) NOT NULL,
+                       s_dist_10 character(24) NOT NULL,
+                       CONSTRAINT stock_pkey PRIMARY KEY (s_w_id, s_i_id),
+                       CONSTRAINT stock_item_fkey FOREIGN KEY (s_i_id) REFERENCES item(i_id),
+                       CONSTRAINT stock_warehouse_fkey FOREIGN KEY (s_w_id) REFERENCES warehouse(w_id)
+);
+
+-- Table: oorder (PK composite + UNIQUE)
+CREATE TABLE oorder (
+                        o_w_id integer NOT NULL,
+                        o_d_id integer NOT NULL,
+                        o_id integer NOT NULL,
+                        o_c_id integer NOT NULL,
+                        o_carrier_id integer,
+                        o_ol_cnt numeric(2,0) NOT NULL,
+                        o_all_local numeric(1,0) NOT NULL,
+                        o_entry_d timestamp without time zone NOT NULL,
+                        CONSTRAINT oorder_pkey PRIMARY KEY (o_w_id, o_d_id, o_id),
+                        CONSTRAINT oorder_unique UNIQUE (o_w_id, o_d_id, o_id, o_c_id),
+                        CONSTRAINT oorder_customer_fkey FOREIGN KEY (o_w_id, o_d_id, o_c_id) REFERENCES customer(c_w_id, c_d_id, c_id),
+                        CONSTRAINT oorder_district_fkey FOREIGN KEY (o_w_id, o_d_id) REFERENCES district(d_w_id, d_id)
+);
+
+-- Table: new_order (PK composite)
+CREATE TABLE new_order (
+                           no_w_id integer NOT NULL,
+                           no_d_id integer NOT NULL,
+                           no_o_id integer NOT NULL,
+                           CONSTRAINT new_order_pkey PRIMARY KEY (no_w_id, no_d_id, no_o_id),
+                           CONSTRAINT new_order_district_fkey FOREIGN KEY (no_w_id, no_d_id) REFERENCES district(d_w_id, d_id)
+);
+
+-- Table: order_line (PK composite, FK multiples)
+CREATE TABLE order_line (
+                            ol_w_id integer NOT NULL,
+                            ol_d_id integer NOT NULL,
+                            ol_o_id integer NOT NULL,
+                            ol_number integer NOT NULL,
+                            ol_i_id integer NOT NULL,
+                            ol_delivery_d timestamp without time zone,
+                            ol_amount numeric(6,2) NOT NULL,
+                            ol_supply_w_id integer NOT NULL,
+                            ol_quantity numeric(2,0) NOT NULL,
+                            ol_dist_info character(24) NOT NULL,
+                            CONSTRAINT order_line_pkey PRIMARY KEY (ol_w_id, ol_d_id, ol_o_id, ol_number),
+                            CONSTRAINT order_line_item_fkey FOREIGN KEY (ol_i_id) REFERENCES item(i_id),
+                            CONSTRAINT order_line_oorder_fkey FOREIGN KEY (ol_w_id, ol_d_id, ol_o_id) REFERENCES oorder(o_w_id, o_d_id, o_id),
+                            CONSTRAINT order_line_stock_fkey FOREIGN KEY (ol_supply_w_id, ol_i_id) REFERENCES stock(s_w_id, s_i_id)
+);
+
+-- Table: history (pas de PK explicite, FK vers customer + district)
+CREATE TABLE history (
+                         h_c_id integer NOT NULL,
+                         h_c_d_id integer NOT NULL,
+                         h_c_w_id integer NOT NULL,
+                         h_d_id integer NOT NULL,
+                         h_w_id integer NOT NULL,
+                         h_date timestamp without time zone NOT NULL,
+                         h_amount numeric(6,2) NOT NULL,
+                         h_data character varying(24) NOT NULL,
+                         CONSTRAINT history_customer_fkey FOREIGN KEY (h_c_w_id, h_c_d_id, h_c_id) REFERENCES customer(c_w_id, c_d_id, c_id),
+                         CONSTRAINT history_district_fkey FOREIGN KEY (h_w_id, h_d_id) REFERENCES district(d_w_id, d_id)
+);
+
+
+
+
+
+
+-------------------------------------------------------
+
+
+-- =========================
+-- Entités
+-- =========================
+
+CREATE TABLE IF NOT EXISTS company (
+                                              "companyID"      INT PRIMARY KEY,
+                                              "name"           TEXT NOT NULL,
+                                              "category"       TEXT NOT NULL,
+                                              "staffSize"      INT NOT NULL,
+                                              "loanBalance"    DOUBLE PRECISION NOT NULL DEFAULT 0,
+                                              "phone"          TEXT NOT NULL,
+                                              "province"       TEXT NOT NULL,
+                                              "city"           TEXT NOT NULL,
+                                              "cityId"         INT NOT NULL,
+                                              "SavingCredit"   BIGINT NOT NULL DEFAULT 0,
+                                              "CheckingCredit" BIGINT NOT NULL DEFAULT 0,
+                                              "LoanCredit"     BIGINT NOT NULL DEFAULT 0,
+                                              "isblocked"      INT NOT NULL DEFAULT 0,
+                                              "createdDate"    TIMESTAMP(3) NOT NULL,
+    "LastUpdateTime" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT company_isblocked_chk CHECK ("isblocked" IN (0,1))
+    );
+
+CREATE TABLE IF NOT EXISTS customer (
+                                               "custID"         INT PRIMARY KEY,
+                                               "companyID"      INT NOT NULL,
+                                               "gender"         TEXT NOT NULL,
+                                               "name"           TEXT NOT NULL,
+                                               "age"            INT NOT NULL,
+                                               "phone"          TEXT NOT NULL,
+                                               "province"       TEXT NOT NULL,
+                                               "city"           TEXT NOT NULL,
+                                               "cityid"         INT NOT NULL,
+                                               "loanBalance"    DOUBLE PRECISION NOT NULL DEFAULT 0,
+                                               "SavingCredit"   BIGINT NOT NULL DEFAULT 0,
+                                               "CheckingCredit" BIGINT NOT NULL DEFAULT 0,
+                                               "LoanCredit"     BIGINT NOT NULL DEFAULT 0,
+                                               "isblocked"      INT NOT NULL DEFAULT 0,
+                                               "createdDate"    TIMESTAMP(3) NOT NULL,
+    "LastUpdateDate" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT customer_company_fk
+    FOREIGN KEY ("companyID") REFERENCES company("companyID"),
+    CONSTRAINT customer_isblocked_chk CHECK ("isblocked" IN (0,1)),
+    CONSTRAINT customer_age_chk CHECK ("age" >= 0)
+    );
+
+-- =========================
+-- Comptes (1 compte par userID)
+-- userID référence customer(custID) OU company(companyID).
+-- Comme SQL ne permet pas une FK vers 2 tables, on utilise
+-- 2 FK optionnelles + un CHECK "exactement une des deux" [web:31].
+-- =========================
+
+CREATE TABLE IF NOT EXISTS savingaccount (
+                                                    "accountID"   INT PRIMARY KEY,
+                                                    "userID"      INT NOT NULL,
+                                                    "balance"     DOUBLE PRECISION NOT NULL DEFAULT 0,
+                                                    "isBlocked"   INT NOT NULL DEFAULT 0,
+                                                    "timestamp"   TIMESTAMP(3) NOT NULL,
+    "fresh_ts"    TIMESTAMP(3) NULL,
+
+    "customerID"  INT NULL,
+    "companyID"   INT NULL,
+
+    CONSTRAINT savingaccount_balance_chk CHECK ("balance" >= 0),
+    CONSTRAINT savingaccount_isblocked_chk CHECK ("isBlocked" IN (0,1)),
+
+    CONSTRAINT savingaccount_customer_fk
+    FOREIGN KEY ("customerID") REFERENCES customer("custID"),
+    CONSTRAINT savingaccount_company_fk
+    FOREIGN KEY ("companyID") REFERENCES company("companyID"),
+
+    CONSTRAINT savingaccount_owner_xor_chk
+    CHECK (
+    (("customerID" IS NOT NULL)::int + ("companyID" IS NOT NULL)::int) = 1
+    AND "userID" = COALESCE("customerID","companyID")
+    ),
+
+    CONSTRAINT savingaccount_one_per_customer_uq UNIQUE ("customerID"),
+    CONSTRAINT savingaccount_one_per_company_uq UNIQUE ("companyID")
+    );
+
+CREATE TABLE IF NOT EXISTS checkingaccount (
+                                                      "accountID"   INT PRIMARY KEY,
+                                                      "userID"      INT NOT NULL,
+                                                      "balance"     DOUBLE PRECISION NOT NULL DEFAULT 0,
+                                                      "isBlocked"   INT NOT NULL DEFAULT 0,
+                                                      "timestamp"   TIMESTAMP(3) NOT NULL,
+
+    "customerID"  INT NULL,
+    "companyID"   INT NULL,
+
+    CONSTRAINT checkingaccount_balance_chk CHECK ("balance" >= 0),
+    CONSTRAINT checkingaccount_isblocked_chk CHECK ("isBlocked" IN (0,1)),
+
+    CONSTRAINT checkingaccount_customer_fk
+    FOREIGN KEY ("customerID") REFERENCES customer("custID"),
+    CONSTRAINT checkingaccount_company_fk
+    FOREIGN KEY ("companyID") REFERENCES company("companyID"),
+
+    CONSTRAINT checkingaccount_owner_xor_chk
+    CHECK (
+    (("customerID" IS NOT NULL)::int + ("companyID" IS NOT NULL)::int) = 1
+    AND "userID" = COALESCE("customerID","companyID")
+    ),
+
+    CONSTRAINT checkingaccount_one_per_customer_uq UNIQUE ("customerID"),
+    CONSTRAINT checkingaccount_one_per_company_uq UNIQUE ("companyID")
+    );
+
+-- =========================
+-- Transactions
+-- TRANSFER : fait par SAVINGACCOUNT (HyBench) [web:31]
+-- CHECKING : fait par CHECKINGACCOUNT (HyBench) [web:31]
+-- =========================
+
+CREATE TABLE IF NOT EXISTS transfer (
+                                               "id"        BIGINT PRIMARY KEY,
+                                               "sourceID"  INT NOT NULL,
+                                               "targetID"  INT NOT NULL,
+                                               "amount"    DOUBLE PRECISION NOT NULL,
+                                               "type"      TEXT NOT NULL,
+                                               "timestamp" TIMESTAMP(3) NOT NULL,
+    "fresh_ts"  TIMESTAMP(3) NULL,
+
+    CONSTRAINT transfer_amount_chk CHECK ("amount" > 0),
+
+    CONSTRAINT transfer_source_fk
+    FOREIGN KEY ("sourceID") REFERENCES savingaccount("accountID"),
+    CONSTRAINT transfer_target_fk
+    FOREIGN KEY ("targetID") REFERENCES savingaccount("accountID"),
+
+    CONSTRAINT transfer_src_tgt_neq_chk CHECK ("sourceID" <> "targetID")
+    );
+
+CREATE TABLE IF NOT EXISTS checking (
+                                               "id"        INT PRIMARY KEY,
+                                               "sourceID"  INT NOT NULL,
+                                               "targetID"  INT NOT NULL,
+                                               "amount"    DOUBLE PRECISION NOT NULL,
+                                               "type"      TEXT NOT NULL,
+                                               "timestamp" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT checking_amount_chk CHECK ("amount" > 0),
+
+    CONSTRAINT checking_source_fk
+    FOREIGN KEY ("sourceID") REFERENCES checkingaccount("accountID"),
+    CONSTRAINT checking_target_fk
+    FOREIGN KEY ("targetID") REFERENCES checkingaccount("accountID"),
+
+    CONSTRAINT checking_src_tgt_neq_chk CHECK ("sourceID" <> "targetID")
+    );
+
+-- =========================
+-- Loan applications & loans
+-- applicantID référence Customer ou Company (HyBench) [web:31]
+-- On modèle comme pour userID: 2 FK optionnelles + check XOR.
+-- =========================
+
+CREATE TABLE IF NOT EXISTS loanapps (
+                                               "id"            INT PRIMARY KEY,
+                                               "applicantID"   INT NOT NULL,
+                                               "amount"        DOUBLE PRECISION NOT NULL,
+                                               "duration"      INT NOT NULL,
+                                               "status"        TEXT NOT NULL,
+                                               "app_timestamp" TIMESTAMP(3) NOT NULL,
+
+    "customerID"    INT NULL,
+    "companyID"     INT NULL,
+
+    CONSTRAINT loanapps_amount_chk CHECK ("amount" > 0),
+    CONSTRAINT loanapps_duration_chk CHECK ("duration" > 0),
+
+    CONSTRAINT loanapps_customer_fk
+    FOREIGN KEY ("customerID") REFERENCES customer("custID"),
+    CONSTRAINT loanapps_company_fk
+    FOREIGN KEY ("companyID") REFERENCES company("companyID"),
+
+    CONSTRAINT loanapps_applicant_xor_chk
+    CHECK (
+    (("customerID" IS NOT NULL)::int + ("companyID" IS NOT NULL)::int) = 1
+    AND "applicantID" = COALESCE("customerID","companyID")
+    )
+    );
+
+CREATE TABLE IF NOT EXISTS loantrans (
+                                                "id"                 INT PRIMARY KEY,
+                                                "applicantID"        INT NOT NULL,
+                                                "appID"              INT NOT NULL,
+                                                "amount"             DOUBLE PRECISION NOT NULL,
+                                                "status"             TEXT NOT NULL,
+                                                "timestamp"          TIMESTAMP(3) NOT NULL,
+    "duration"           INT NOT NULL,
+    "contract_timestamp" TIMESTAMP(3) NULL,
+    "delinquency"        INT NOT NULL DEFAULT 0,
+
+    "customerID"         INT NULL,
+    "companyID"          INT NULL,
+
+    CONSTRAINT loantrans_app_fk
+    FOREIGN KEY ("appID") REFERENCES loanapps("id"),
+
+    CONSTRAINT loantrans_amount_chk CHECK ("amount" > 0),
+    CONSTRAINT loantrans_duration_chk CHECK ("duration" > 0),
+    CONSTRAINT loantrans_delinquency_chk CHECK ("delinquency" >= 0),
+
+    CONSTRAINT loantrans_customer_fk
+    FOREIGN KEY ("customerID") REFERENCES customer("custID"),
+    CONSTRAINT loantrans_company_fk
+    FOREIGN KEY ("companyID") REFERENCES company("companyID"),
+
+    CONSTRAINT loantrans_applicant_xor_chk
+    CHECK (
+    (("customerID" IS NOT NULL)::int + ("companyID" IS NOT NULL)::int) = 1
+    AND "applicantID" = COALESCE("customerID","companyID")
+    )
+    );

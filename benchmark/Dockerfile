@@ -7,7 +7,7 @@ COPY proxy/pom.xml ./pom.xml
 COPY proxy/proxy-core ./proxy-core
 COPY proxy/executors ./executors
 COPY proxy/proxy-api ./proxy-api
-COPY proxy/proxy-pgwire ./proxy-pgwire
+#COPY proxy/proxy-pgwire ./proxy-pgwire
 COPY proxy/utils ./utils
 COPY proxy/proxy-jdbc ./proxy-jdbc
 RUN mvn clean package -DskipTests -pl utils,proxy-jdbc -am

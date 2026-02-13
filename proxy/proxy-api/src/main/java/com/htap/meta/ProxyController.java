@@ -60,8 +60,21 @@ public class ProxyController {
      */
     @PostMapping("/query")
     public Object executeQueryPost(@RequestBody SqlRequest req) throws Exception {
-        return queryRouter.route(req.sql);
+        try {
+            return queryRouter.route(req.sql);
+        } catch (Exception e) {
+            System.err.println("\n[HTAP-PROXY] ERROR while handling SQL:\n" + req.sql);
+            e.printStackTrace();
+            throw e;
+        }
     }
+
+
+    @GetMapping("/ready")
+    public String ready() {
+        return "OK";
+    }
+
 
     /**
      *

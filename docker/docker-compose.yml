@@ -127,6 +127,7 @@ services:
     environment:
       POSTGRES_URL: jdbc:postgresql://postgres:5432/htapdb?user=htap&password=htap
       CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
+      JAVA_TOOL_OPTIONS: "-Xms512m -Xmx2g"
     ports:
       - "8080:8080"
       #- "5432:5432"
@@ -134,38 +135,27 @@ services:
       - htap-net
 
 
+    # Si on veut le benchmark fait-maison
   benchmark:
     build:
-      context: ..
-      dockerfile: benchmark_official/Dockerfile
+      context: ../
+      dockerfile: benchmark/Dockerfile
+      args:
+        - PROXY_PATH=../proxy
     container_name: htap-benchmark
     depends_on:
       - proxy
+    environment:
+      PROXY_URL: http://htap-proxy:8080/proxy/query
+      JDBC_URL: jdbc:htap://htap-proxy:8080
+      METRICS_FILE: /data/metrics/htap_metrics.csv
+      # WORKLOAD_OLTP_FILE: workload/oltp.sql
+      # WORKLOAD_OLAP_FILE: workload/olap.sql
+    volumes:
+      - ../benchmark/src/main/resources/workload:/app/workload:ro
+      - ./metrics:/data/metrics
     networks:
       - htap-net
-
-
-    # Si on veut le benchmark fait-maison
-#  benchmark:
-#    build:
-#      context: ../
-#      dockerfile: benchmark/Dockerfile
-#      args:
-#        - PROXY_PATH=../proxy
-#    container_name: htap-benchmark
-#    depends_on:
-#      - proxy
-#    environment:
-#      PROXY_URL: http://htap-proxy:8080/proxy/query
-#      JDBC_URL: jdbc:htap:http://htap-proxy:8080
-#      METRICS_FILE: /data/metrics/htap_metrics.csv
-#      # WORKLOAD_OLTP_FILE: workload/oltp.sql
-#      # WORKLOAD_OLAP_FILE: workload/olap.sql
-#    volumes:
-#      - ../benchmark/src/main/resources/workload:/app/workload:ro
-#      - ./metrics:/data/metrics
-#    networks:
-#      - htap-net
 
 
 
