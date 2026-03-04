@@ -6,20 +6,10 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 
-/**
- * Application de consommation Kafka vers ClickHouse.
- *
- * Optimisations fraîcheur :
- * - poll Kafka toutes les 100 ms (au lieu de 1 s)
- * - MAX_POLL_RECORDS plus petit
- * - flush time-based toutes les 1 s (inchangé)
- */
 public class KafkaConsumerApp {
 
-    // Batch max en mémoire par table avant flush forcé
-    private static final int BATCH_MAX_SIZE = 30_000;       // réduit (avant 500_000)
-    // Intervalle max entre deux flushs (time-based)
-    private static final long FLUSH_INTERVAL_MS = 500;
+    private static final int BATCH_MAX_SIZE = 30_000;
+    private static final long FLUSH_INTERVAL_MS = 100;
 
     public static void main(String[] args) throws Exception {
         String kafkaBootstrap = System.getenv().getOrDefault("KAFKA_BOOTSTRAP", "kafka:9092");
@@ -42,63 +32,46 @@ public class KafkaConsumerApp {
 
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
 
-        List<String> htapsTopics = new ArrayList<>();
-        for (String topic : consumer.listTopics().keySet()) {
-            if (topic.startsWith("htap.")) {
-                htapsTopics.add(topic);
-            }
-        }
-
-        if (htapsTopics.isEmpty()) {
-            System.err.println("Aucun topic htap trouvé !");
-            return;
-        }
-
-//        List<String> htapTopics = Arrays.asList(
-//                "htap.public.warehouse",
-//                "htap.public.district",
-//                "htap.public.customer",
-//                "htap.public.start",
-//                "htap.public.orders",
-//                "htap.public.order_line"
-//        );
-List<String> htapTopics = Arrays.asList(
+        List<String> htapTopics = Arrays.asList(
                 "htap.public.customer",
                 "htap.public.district",
                 "htap.public.history",
                 "htap.public.item",
                 "htap.public.nation",
                 "htap.public.new_order",
-        "htap.public.oorder",
-        "htap.public.order_line",
-        "htap.public.region",
-        "htap.public.stock",
-        "htap.public.supplier",
-        "htap.public.warehouse",
-        "htap.public.start"
+                "htap.public.oorder",
+                "htap.public.order_line",
+                "htap.public.region",
+                "htap.public.stock",
+                "htap.public.supplier",
+                "htap.public.warehouse",
+                "htap.public.start"
         );
 
         consumer.subscribe(htapTopics);
         System.out.println("Kafka consumer démarré pour les topics: " + htapTopics);
 
-        Connection conn = null;
-        while (conn == null) {
-            try {
-                conn = DriverManager.getConnection(clickhouseUrl);
-                System.out.println("Connecté à ClickHouse !");
+        // Attendre ClickHouse
+        boolean clickhouseReady = false;
+        while (!clickhouseReady) {
+            try (Connection testConn = DriverManager.getConnection(clickhouseUrl)) {
+                clickhouseReady = true;
+                System.out.println("ClickHouse disponible !");
             } catch (SQLException e) {
                 System.out.println("ClickHouse non disponible, attente 5s...");
                 Thread.sleep(5000);
             }
         }
 
-        ExecutorService insertExecutor = Executors.newFixedThreadPool(htapTopics.size() * 8);
+        // 1 thread par table, chacun avec sa propre connexion
+        ExecutorService insertExecutor = Executors.newFixedThreadPool(htapTopics.size());
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
+        // Chaque BatchFlusher crée sa propre connexion ClickHouse
         Map<String, BatchFlusher> tableFlushers = new HashMap<>();
         for (String topic : htapTopics) {
             String table = topicToTable(topic);
-            tableFlushers.put(table, new BatchFlusher(table, conn, insertExecutor));
+            tableFlushers.put(table, new BatchFlusher(table, clickhouseUrl, insertExecutor));
         }
 
         scheduler.scheduleAtFixedRate(() -> {
@@ -109,7 +82,6 @@ List<String> htapTopics = Arrays.asList(
 
         while (true) {
             ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(100));
-
             for (ConsumerRecord<String, String> record : records) {
                 String table = topicToTable(record.topic());
                 try {
@@ -140,10 +112,21 @@ List<String> htapTopics = Arrays.asList(
         private final List<Map<String, Object>> batch = Collections.synchronizedList(new ArrayList<>());
         private Set<String> columnsCache = null;
 
-        public BatchFlusher(String table, Connection conn, ExecutorService executor) {
+        public BatchFlusher(String table, String clickhouseUrl, ExecutorService executor) throws SQLException {
             this.table = table;
-            this.conn = conn;
             this.executor = executor;
+            // Connexion dédiée par table
+            Connection c = null;
+            while (c == null) {
+                try {
+                    c = DriverManager.getConnection(clickhouseUrl);
+                    System.out.println("Connexion ClickHouse créée pour table: " + table);
+                } catch (SQLException e) {
+                    System.out.println("Attente connexion ClickHouse pour " + table + "...");
+                    try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                }
+            }
+            this.conn = c;
         }
 
         public void add(Map<String, Object> row) {
@@ -188,17 +171,13 @@ List<String> htapTopics = Arrays.asList(
                         for (String col : colsToInsert) {
                             Object v = row.get(col);
                             if (v instanceof Long && isTimestampColumn(col)) {
-                                // epoch millis -> java.sql.Timestamp pour ClickHouse DateTime64(3)
-                                ps.setTimestamp(idx++, new java.sql.Timestamp((Long)v));
+                                ps.setTimestamp(idx++, new java.sql.Timestamp((Long) v));
                             } else {
                                 ps.setObject(idx++, v);
                             }
-
                         }
-
                         ps.addBatch();
                     }
-
                     ps.executeBatch();
                     System.out.println("Batch inséré dans " + table + ": " + batchToInsert.size() + " lignes");
                 }
@@ -206,25 +185,20 @@ List<String> htapTopics = Arrays.asList(
                 e.printStackTrace();
             }
         }
-//
-//        private boolean isTimestampColumn(String col) {
-//            return col.equals("O_ENTRY_D") || col.equals("OL_DELIVERY_D") || col.equals("H_DATE") || col.equals("C_SINCE");
-//        }
 
         private boolean isTimestampColumn(String col) {
-            return col.equals("o_entry_d") || col.equals("ol_delivery_d") || col.equals("h_date") || col.equals("c_since");
+            return col.equals("o_entry_d") || col.equals("ol_delivery_d")
+                    || col.equals("h_date") || col.equals("c_since");
         }
-
 
         private Set<String> getExistingColumns(Connection conn, String table) throws SQLException {
             Set<String> columns = new HashSet<>();
             String sql = "SELECT name FROM system.columns WHERE database = 'default' AND table = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, table);
+                ps.setString(1, table.toUpperCase());
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        String col = rs.getString("name");
-                        columns.add(col);
+                        columns.add(rs.getString("name"));
                     }
                 }
             }
@@ -232,5 +206,4 @@ List<String> htapTopics = Arrays.asList(
             return columns;
         }
     }
-
 }

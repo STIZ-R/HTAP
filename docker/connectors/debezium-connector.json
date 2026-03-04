@@ -14,8 +14,11 @@
     "table.include.list": "public.*",
     "tombstones.on.delete": "false",
     "topic.prefix": "htap",
-    "poll.interval.ms": "50",
-    "max.queue.size": "100000",
-    "max.batch.size": "30000"
+    "poll.interval.ms": "10",
+    "max.queue.size": "200000",
+    "max.batch.size": "50000",
+    "heartbeat.interval.ms": "1000",
+    "heartbeat.action.query": "UPDATE public.start SET debug=debug+1 WHERE id=0",
+    "status.update.interval.ms": "1000"
   }
 }
