@@ -11,21 +11,24 @@ COPY proxy-jdbc ./proxy-jdbc
 
 RUN mvn clean package -DskipTests
 
+# Télécharge l'agent OpenTelemetry
+ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar /app/otel-agent.jar
+
 # Étape runtime
 FROM eclipse-temurin:17-jdk
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
 
-# Copier le JAR Spring Boot construit par proxy-api
 COPY --from=build /app/proxy-api/target/proxy-api-1.0-SNAPSHOT.jar ./app.jar
+# Copie l'agent depuis l'étape build
+COPY --from=build /app/otel-agent.jar ./otel-agent.jar
 
-# Script wait-for
 COPY wait-for-postgres.sh /wait-for-postgres.sh
 RUN chmod +x /wait-for-postgres.sh
 
 ENV POSTGRES_HOST=postgres
 ENV POSTGRES_PORT=5432
+ENV JAVA_TOOL_OPTIONS="-javaagent:/app/otel-agent.jar"
 
-# Lancer Spring Boot après avoir attendu Postgres
 CMD ["/bin/sh", "/wait-for-postgres.sh"]

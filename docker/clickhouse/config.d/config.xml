@@ -1,0 +1,5 @@
+<profiles>
+    <default>
+        <case_insensitive_identifiers>1</case_insensitive_identifiers>
+    </default>
+</profiles>

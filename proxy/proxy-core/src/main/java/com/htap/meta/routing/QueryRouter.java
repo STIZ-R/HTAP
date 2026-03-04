@@ -71,7 +71,7 @@ public class QueryRouter {
             case OLTP_ONLY:
                 return executorFactory.getOLTPExecutor().execute(sql); // List<Map> ou int
             case OLAP_ONLY:
-                String olapSql = sql.contains("HTAP_STRICT") ? addFinalWithJSqlParser(sql) : sql;
+                String olapSql = sql.contains("HTAP_STRICT") ? /*addFinalWithJSqlParser(sql)*/sql : sql;
                 return executorFactory.getOLAPExecutor().execute(olapSql); // List<Map>
             case HYBRID:
                 Future<Object> fHot = pool.submit((Callable<Object>) () ->

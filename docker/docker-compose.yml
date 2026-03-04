@@ -4,6 +4,7 @@ services:
 
   postgres:
     image: debezium/postgres:15
+    shm_size: 1g
     container_name: htap-postgres
     environment:
       POSTGRES_USER: htap
@@ -15,6 +16,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d
+    command: ["postgres", "-c", "max_connections=500", "-c", "max_wal_size=2GB", "-c", "password_encryption=md5"]
     networks:
       - htap-net
 
@@ -124,9 +126,13 @@ services:
     depends_on:
       - postgres
       - clickhouse
+      - jaeger
     environment:
       POSTGRES_URL: jdbc:postgresql://postgres:5432/htapdb?user=htap&password=htap
       CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/default?user=default&password=clickhouse&use_http_transport=true
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_SERVICE_NAME: htap-proxy
     ports:
       - "8080:8080"
       #- "5432:5432"
@@ -146,26 +152,26 @@ services:
 
 
     # Si on veut le benchmark fait-maison
-#  benchmark:
-#    build:
-#      context: ../
-#      dockerfile: benchmark/Dockerfile
-#      args:
-#        - PROXY_PATH=../proxy
-#    container_name: htap-benchmark
-#    depends_on:
-#      - proxy
-#    environment:
-#      PROXY_URL: http://htap-proxy:8080/proxy/query
-#      JDBC_URL: jdbc:htap:http://htap-proxy:8080
-#      METRICS_FILE: /data/metrics/htap_metrics.csv
-#      # WORKLOAD_OLTP_FILE: workload/oltp.sql
-#      # WORKLOAD_OLAP_FILE: workload/olap.sql
-#    volumes:
-#      - ../benchmark/src/main/resources/workload:/app/workload:ro
-#      - ./metrics:/data/metrics
-#    networks:
-#      - htap-net
+  benchmark_perso:
+    build:
+      context: ../
+      dockerfile: benchmark/Dockerfile
+      args:
+        - PROXY_PATH=../proxy
+    container_name: htap-benchmarks
+    depends_on:
+      - proxy
+    environment:
+      PROXY_URL: http://htap-proxy:8080/proxy/query
+      JDBC_URL: jdbc:htap://htap-proxy:8080/htapdb #jdbc:htap:http://htap-proxy:8080
+      METRICS_FILE: /data/metrics/htap_metrics.csv
+      # WORKLOAD_OLTP_FILE: workload/oltp.sql
+      # WORKLOAD_OLAP_FILE: workload/olap.sql
+    volumes:
+      - ../benchmark/src/main/resources/workload:/app/workload:ro
+      - ./metrics:/data/metrics
+    networks:
+      - htap-net
 
 
 
@@ -183,6 +189,19 @@ services:
     restart: always
     networks:
       - htap-net
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: htap-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # UI web
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"
+    networks:
+      - htap-net
+
 
 #  sink2:
 #    build:

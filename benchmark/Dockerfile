@@ -7,7 +7,6 @@ COPY proxy/pom.xml ./pom.xml
 COPY proxy/proxy-core ./proxy-core
 COPY proxy/executors ./executors
 COPY proxy/proxy-api ./proxy-api
-COPY proxy/proxy-pgwire ./proxy-pgwire
 COPY proxy/utils ./utils
 COPY proxy/proxy-jdbc ./proxy-jdbc
 RUN mvn clean package -DskipTests -pl utils,proxy-jdbc -am
@@ -30,5 +29,5 @@ FROM eclipse-temurin:17-jdk
 WORKDIR /app
 COPY --from=benchmark-build /app/target/benchmark.jar ./benchmark.jar
 COPY --from=benchmark-build /app/libs/ ./libs/
-ENV JDBC_URL="jdbc:htap:http://htap-proxy:8080"
+ENV JDBC_URL="jdbc:htap://htap-proxy:8080/htapdb"
 ENTRYPOINT ["sh", "-c", "java -cp 'benchmark.jar:libs/*' com.poc.meta.HTAPRunner"]

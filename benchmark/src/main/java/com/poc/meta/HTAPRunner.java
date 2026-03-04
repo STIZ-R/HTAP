@@ -41,6 +41,9 @@ public class HTAPRunner {
         String populatePath = props.getProperty("populate.oltp", "workload/populate.sql");
         String olapOnlyPath = props.getProperty("workload.olap_only", "workload/olap_only.sql");
 
+        int nbWarehouses = Integer.parseInt(props.getProperty("oltp.warehouses", "1"));
+        int nbDistricts  = Integer.parseInt(props.getProperty("oltp.districts",  "1"));
+
         boolean oltpOnly = "oltp_only".equalsIgnoreCase(runMode);
         boolean htapMode = "htap".equalsIgnoreCase(runMode);
         boolean olapOnly = "olap_only".equalsIgnoreCase(runMode);
@@ -63,7 +66,7 @@ public class HTAPRunner {
             if (populatePath == null || olapOnlyPath == null) {
                 throw new IllegalArgumentException("populate.oltp et workload.olap_only doivent être définis en olap_only");
             }
-            populateSql = WorkloadLoader.loadSqlFile(populatePath);
+            //populateSql = WorkloadLoader.loadSqlFile(populatePath);
             olapQueries = WorkloadLoader.loadSqlFile(olapOnlyPath);
         }
 
@@ -165,7 +168,7 @@ public class HTAPRunner {
             List<Future<OLTPWorker.Result>> oltpFutures = new ArrayList<>();
             for (int i = 0; i < oltpThreads; i++) {
                 oltpFutures.add(pool.submit(
-                        new OLTPWorker(proxyClient, oltpTemplates, txPerThread, batchSize, i, recorder, runMode)
+                        new OLTPWorker(proxyClient, oltpTemplates, txPerThread, batchSize, i, recorder, runMode, nbWarehouses, nbDistricts)
                 ));
             }
 
@@ -263,7 +266,7 @@ public class HTAPRunner {
         while (true) {
             try {
                 int cnt = proxyClient.executeScalarInt(
-                        "SELECT count(*) AS cnt FROM start WHERE id=1 AND debug=42" +
+                        "SELECT count(*) AS cnt FROM START WHERE id=1 AND debug=42" +
                                 " AND _deleted=0"  // ← Ignore soft-deletes sink
                 );
 
@@ -288,7 +291,7 @@ public class HTAPRunner {
         while (true) {
             try {
                 int cnt = proxyClient.executeScalarInt(
-                        "SELECT count(*) FROM orders WHERE _deleted=0"
+                        "SELECT count(*) FROM OORDER WHERE _deleted=0"
                 );
 
                 if (cnt > 1000) {   // seuil minimal
@@ -314,7 +317,7 @@ public class HTAPRunner {
                     long tClient = System.currentTimeMillis();
 
                     Long lastTsMillis = proxyClient.executeScalarTimestampMillis(
-                            "SELECT max(o_entry_d) AS last_ts FROM orders"
+                            "SELECT max(o_entry_d) AS last_ts FROM OORDER"
                     );
 
                     Long freshnessMs = null;

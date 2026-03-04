@@ -5,15 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 /**
- * Conversion générique Debezium -> Map colonne -> valeur,
- * avec support automatique des Decimal (toutes tables).
- * Ajout de _event_ts_ms pour mesurer la fraîcheur.
+ * Conversion Debezium -> Map colonne->valeur pour ClickHouse DateTime64.
+ * Support automatique des Decimal et timestamps ISO8601.
  */
 public class Row2Column {
 
@@ -43,10 +43,9 @@ public class Row2Column {
         row.put("_op", op);
         row.put("_version", version);
         row.put("_deleted", "d".equals(op) ? 1 : 0);
-        // horodatage d'événement pour la fraîcheur OLAP
         row.put("_event_ts_ms", ts);
 
-        // DELETE : on simplifie, pas de PK spécifique
+        // DELETE : on simplifie
         if ("d".equals(op)) {
             return row;
         }
@@ -61,32 +60,33 @@ public class Row2Column {
                 JsonNode val = nodeToCopy.get(f);
 
                 if (val == null || val.isNull()) {
-                    row.put(f, null);
+                    row.put(normalizeColumn(f), null);
                 } else if (val.isInt()) {
-                    row.put(f, val.asInt());
+                    row.put(normalizeColumn(f), val.asInt());
                 } else if (val.isLong()) {
                     long v = val.asLong();
-                    if ("o_entry_d".equals(f)) {
-                        row.put(f, v / 1000);
+                    if (isTimestampField(f)) {
+                        row.put(normalizeColumn(f), v); // epoch millis
                     } else {
-                        row.put(f, v);
+                        row.put(normalizeColumn(f), v);
                     }
                 } else if (val.isTextual() || val.isBinary()) {
-                    // Base64 -> Decimal
                     Integer scale = decimalScales.get(f);
                     if (scale != null) {
                         try {
                             byte[] bytes = val.isTextual() ? Base64.getDecoder().decode(val.asText()) : val.binaryValue();
                             BigInteger bi = new BigInteger(bytes);
-                            row.put(f, new BigDecimal(bi, scale));
+                            row.put(normalizeColumn(f), new BigDecimal(bi, scale));
                         } catch (Exception e) {
-                            row.put(f, val.isTextual() ? val.asText() : null);
+                            row.put(normalizeColumn(f), val.isTextual() ? val.asText() : null);
                         }
+                    } else if (isTimestampField(f)) {
+                        // Convertit ISO8601 -> epoch ms
+                        row.put(f, parseISO8601ToEpochMs(val.asText()));
                     } else {
-                        row.put(f, val.isTextual() ? val.asText() : new String(val.binaryValue()));
+                        row.put(normalizeColumn(f), val.isTextual() ? val.asText() : new String(val.binaryValue()));
                     }
                 } else if (val.isObject()) {
-                    // Cas Debezium Decimal : { "scale": X, "value": Base64String }
                     JsonNode valueNode = val.get("value");
                     JsonNode scaleNode = val.get("scale");
                     if (valueNode != null && scaleNode != null) {
@@ -94,26 +94,38 @@ public class Row2Column {
                             byte[] bytes = Base64.getDecoder().decode(valueNode.asText());
                             BigInteger bi = new BigInteger(bytes);
                             int scale = scaleNode.asInt();
-                            row.put(f, new BigDecimal(bi, scale));
+                            row.put(normalizeColumn(f), new BigDecimal(bi, scale));
                         } catch (Exception e) {
-                            row.put(f, null);
+                            row.put(normalizeColumn(f), null);
                         }
                     } else {
-                        row.put(f, val.toString());
+                        row.put(normalizeColumn(f), val.toString());
                     }
                 } else {
-                    row.put(f, val.toString());
+                    row.put(normalizeColumn(f), val.toString());
                 }
             }
         }
 
         return row;
     }
+    private static String normalizeColumn(String col) {
+        return col.toLowerCase(); // si toutes les tables et colonnes ClickHouse sont en majuscules
+    }
 
-    /**
-     * Parcourt le schema Debezium et récupère pour chaque champ Decimal son "scale".
-     * Fonctionne pour toute table (users, orders, customer, etc.).
-     */
+
+    private static long parseISO8601ToEpochMs(String ts) {
+        Instant instant = Instant.parse(ts);
+        return instant.toEpochMilli();
+    }
+
+    private static boolean isTimestampField(String field) {
+        return field.equals("o_entry_d")
+                || field.equals("ol_delivery_d")
+                || field.equals("h_date")
+                || field.equals("c_since");
+    }
+
     private static Map<String, Integer> extractDecimalScales(JsonNode schema) {
         Map<String, Integer> map = new HashMap<>();
         if (schema == null) return map;
@@ -125,9 +137,8 @@ public class Row2Column {
             JsonNode fieldNameNode = field.get("field");
             if (fieldNameNode == null) continue;
             String fieldName = fieldNameNode.asText();
-            if (!"after".equals(fieldName) && !"before".equals(fieldName)) {
-                continue;
-            }
+            if (!"after".equals(fieldName) && !"before".equals(fieldName)) continue;
+
             JsonNode struct = field.get("fields");
             if (struct == null || !struct.isArray()) continue;
 
@@ -137,12 +148,11 @@ public class Row2Column {
                 String colName = colNameNode.asText();
 
                 JsonNode colType = col.get("type");
-                JsonNode typeName = col.get("name"); // org.apache.kafka.connect.data.Decimal
+                JsonNode typeName = col.get("name");
 
                 if (colType != null && "bytes".equals(colType.asText())
                         && typeName != null
                         && "org.apache.kafka.connect.data.Decimal".equals(typeName.asText())) {
-
                     JsonNode params = col.get("parameters");
                     if (params != null && params.has("scale")) {
                         int scale = Integer.parseInt(params.get("scale").asText());

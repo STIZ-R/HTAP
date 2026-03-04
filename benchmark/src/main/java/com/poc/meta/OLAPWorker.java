@@ -30,7 +30,7 @@ public class OLAPWorker implements Runnable {
         String mainOlapQuery = olapQueries.get(0);
         String freshnessProbe = (olapQueries.size() > 1)
                 ? olapQueries.get(1)
-                : "SELECT max(o_entry_d) AS last_ts FROM orders";
+                : "SELECT max(o_entry_d) AS last_ts FROM OORDER";
 
         try {
             while (true) {

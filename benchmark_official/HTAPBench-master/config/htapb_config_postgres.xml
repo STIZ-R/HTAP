@@ -19,18 +19,18 @@
 
 
 	<!-- Paramètres HTAPBench -->
-	<target_TPS>2</target_TPS>
+	<target_TPS>5</target_TPS>
 	<error_margin>0.2</error_margin>
-	<warehouses>10</warehouses>
-	<OLTP_workers>5</OLTP_workers>
-	<OLAP_workers>4</OLAP_workers>
+	<warehouses>1</warehouses>
+	<OLTP_workers>6</OLTP_workers>
+	<OLAP_workers>1</OLAP_workers>
 
 	<!-- Workload weights -->
 	<works>
 		<work>
 			<time>120</time>
 			<!-- 28 transactions pour correspondre aux types -->
-			<weights>45,44,4,4,3,3,2,3,2,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5</weights>
+			<weights>46,47,0,4,3,3,2,3,2,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5</weights>
 		</work>
 	</works>
 

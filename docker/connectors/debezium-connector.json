@@ -14,8 +14,8 @@
     "table.include.list": "public.*",
     "tombstones.on.delete": "false",
     "topic.prefix": "htap",
-    "poll.interval.ms": "20",
-    "max.queue.size": "200000",
-    "max.batch.size": "80000"
+    "poll.interval.ms": "50",
+    "max.queue.size": "100000",
+    "max.batch.size": "30000"
   }
 }

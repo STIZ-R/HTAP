@@ -74,7 +74,8 @@ List<String> htapTopics = Arrays.asList(
         "htap.public.region",
         "htap.public.stock",
         "htap.public.supplier",
-        "htap.public.warehouse"
+        "htap.public.warehouse",
+        "htap.public.start"
         );
 
         consumer.subscribe(htapTopics);
@@ -186,8 +187,15 @@ List<String> htapTopics = Arrays.asList(
                         int idx = 1;
                         for (String col : colsToInsert) {
                             Object v = row.get(col);
-                            ps.setObject(idx++, v);
+                            if (v instanceof Long && isTimestampColumn(col)) {
+                                // epoch millis -> java.sql.Timestamp pour ClickHouse DateTime64(3)
+                                ps.setTimestamp(idx++, new java.sql.Timestamp((Long)v));
+                            } else {
+                                ps.setObject(idx++, v);
+                            }
+
                         }
+
                         ps.addBatch();
                     }
 
@@ -198,6 +206,15 @@ List<String> htapTopics = Arrays.asList(
                 e.printStackTrace();
             }
         }
+//
+//        private boolean isTimestampColumn(String col) {
+//            return col.equals("O_ENTRY_D") || col.equals("OL_DELIVERY_D") || col.equals("H_DATE") || col.equals("C_SINCE");
+//        }
+
+        private boolean isTimestampColumn(String col) {
+            return col.equals("o_entry_d") || col.equals("ol_delivery_d") || col.equals("h_date") || col.equals("c_since");
+        }
+
 
         private Set<String> getExistingColumns(Connection conn, String table) throws SQLException {
             Set<String> columns = new HashSet<>();
@@ -206,10 +223,12 @@ List<String> htapTopics = Arrays.asList(
                 ps.setString(1, table);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        columns.add(rs.getString("name"));
+                        String col = rs.getString("name");
+                        columns.add(col);
                     }
                 }
             }
+            System.out.println("Colonnes existantes pour table " + table + ": " + columns);
             return columns;
         }
     }
